@@ -1,0 +1,6 @@
+{
+  "name": "Aplikasi Tagihan dan Pengatur Keuangan",
+  "description": "Sistem pengelolaan tagihan WiFi, PLN, dan PDAM terintegrasi dengan pencatatan keuangan harian, mingguan, bulanan, serta template Spreadsheet dan Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
