@@ -26,7 +26,6 @@ import PembayaranManager from './components/PembayaranManager';
 import PetugasManager from './components/PetugasManager';
 import KeuanganManager from './components/KeuanganManager';
 import PlanningKeuangan from './components/PlanningKeuangan';
-import TemplateSheets from './components/TemplateSheets';
 import BackupRestore from './components/BackupRestore';
 
 import { Shield, Lock, Cloud, CloudOff, RefreshCw, FolderSync } from 'lucide-react';
@@ -696,47 +695,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Cloud Sync Status Indicator */}
-            {firebaseUser ? (
-              <div 
-                className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition duration-300 ${
-                  syncError 
-                    ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' 
-                    : syncing 
-                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
-                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                }`}
-                title={syncError || (syncing ? 'Sedang menyinkronkan data ke Firebase...' : 'Data Anda sepenuhnya aman di Cloud Firebase')}
-              >
-                {syncError ? (
-                  <>
-                    <CloudOff className="h-3 w-3 text-rose-400" />
-                    <span>Gagal Sinkron</span>
-                  </>
-                ) : syncing ? (
-                  <>
-                    <RefreshCw className="h-2.5 w-2.5 animate-spin text-amber-400" />
-                    <span>Sinkronisasi...</span>
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Cloud Tersinkron</span>
-                  </>
-                )}
-              </div>
-            ) : (
-              <button
-                id="header-btn-connect-cloud"
-                onClick={handleGoogleSignIn}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 px-2.5 py-1 rounded-lg transition cursor-pointer"
-                title="Hubungkan database dengan akun Google Firebase Anda untuk pencadangan otomatis"
-              >
-                <CloudOff className="h-3.5 w-3.5" />
-                <span>Hubungkan Cloud</span>
-              </button>
-            )}
-
             <div className="text-right">
               <span className="text-[10px] text-slate-400 block font-bold uppercase">Akses Masuk Anda:</span>
               <span className="text-xs font-bold text-slate-200">{currentUser.name}</span>
@@ -831,10 +789,6 @@ export default function App() {
               onUpdateBudget={handleUpdateBudget}
               onDeleteBudget={handleDeleteBudget}
             />
-          )}
-
-          {activeTab === 'templates' && (
-            <TemplateSheets />
           )}
 
           {activeTab === 'backup' && currentUser.role === 'admin' && (

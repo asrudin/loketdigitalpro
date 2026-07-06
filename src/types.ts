@@ -8,7 +8,6 @@ export type ActiveTab =
   | 'petugas'
   | 'keuangan'
   | 'planning'
-  | 'templates'
   | 'backup';
 
 export interface User {
