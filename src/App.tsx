@@ -401,6 +401,48 @@ export default function App() {
     });
   };
 
+  const handleAddPetugas = (newUser: Omit<User, 'id'>) => {
+    setUsers(prev => {
+      const exists = prev.some(u => u.username.toLowerCase() === newUser.username.toLowerCase());
+      if (exists) {
+        alert('Username sudah terdaftar! Harap gunakan username lain.');
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          ...newUser,
+          id: 'user-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
+        }
+      ];
+    });
+  };
+
+  const handleUpdatePetugas = (updatedUser: User) => {
+    setUsers(prev => {
+      const isDuplicateUsername = prev.some(u => u.id !== updatedUser.id && u.username.toLowerCase() === updatedUser.username.toLowerCase());
+      if (isDuplicateUsername) {
+        alert('Username sudah terdaftar pada petugas lain! Harap gunakan username lain.');
+        return prev;
+      }
+      return prev.map(u => u.id === updatedUser.id ? updatedUser : u);
+    });
+
+    // If current logged-in user updated their own name/username, update session info too
+    if (currentUser && currentUser.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
+      saveStoredData('logged_in_user', updatedUser);
+    }
+  };
+
+  const handleDeletePetugas = (id: string) => {
+    if (currentUser && id === currentUser.id) {
+      alert('Anda tidak bisa menghapus akun Anda sendiri yang sedang aktif digunakan!');
+      return;
+    }
+    setUsers(prev => prev.filter(u => u.id !== id));
+  };
+
   const handleImportPembayaran = (importedPayments: {
     pelangganCodeOrName: string;
     type: BillType;
@@ -766,6 +808,9 @@ export default function App() {
               onDeleteArea={handleDeleteArea}
               onAssignUserArea={handleAssignUserArea}
               onImportPetugas={handleImportPetugas}
+              onAddPetugas={handleAddPetugas}
+              onUpdatePetugas={handleUpdatePetugas}
+              onDeletePetugas={handleDeletePetugas}
             />
           )}
 

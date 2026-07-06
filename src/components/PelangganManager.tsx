@@ -165,41 +165,53 @@ export default function PelangganManager({
     document.body.removeChild(link);
   };
 
-  // Import Customer CSV logic
-  const handleImportCSVSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Robust CSV Parsing with Delimiter Autodetect & Quotes Support
+  const parseAndImportCSVText = (text: string) => {
     setImportError('');
     setImportSuccess('');
 
-    if (!csvText.trim()) {
-      setImportError('Teks CSV kosong. Silakan paste baris data.');
-      return;
-    }
-
     try {
-      const lines = csvText.trim().split('\n');
+      const cleanText = text.trim();
+      if (!cleanText) {
+        setImportError('Teks CSV kosong.');
+        return;
+      }
+
+      const lines = cleanText.split(/\r?\n/);
       if (lines.length < 2) {
         setImportError('Format CSV salah. Butuh setidaknya satu baris header dan satu baris data.');
         return;
       }
 
+      // Detect delimiter: detect whether semicolon (;) or comma (,) is more prevalent in headers
+      const firstLine = lines[0];
+      const commaCount = (firstLine.match(/,/g) || []).length;
+      const semicolonCount = (firstLine.match(/;/g) || []).length;
+      const delimiter = semicolonCount > commaCount ? ';' : ',';
+
       // Parse headers
-      const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+      const headers = firstLine.toLowerCase().split(delimiter).map(h => h.trim().replace(/"/g, ''));
       const parsedData: Omit<Pelanggan, 'id' | 'code'>[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        // Split handling values inside quotes correctly
-        const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
-        
+        const currentLine = lines[i].trim();
+        if (!currentLine) continue;
+
+        // Split columns while correctly keeping text inside double quotes
+        let values: string[] = [];
+        if (delimiter === ';') {
+          values = currentLine.split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+        } else {
+          values = currentLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+        }
+
         const rowObj: any = {};
         headers.forEach((h, index) => {
-          rowObj[h] = values[index] || '';
+          rowObj[h] = values[index] !== undefined ? values[index].trim() : '';
         });
 
-        // Map keys to match schema
-        const mappedName = rowObj['nama_warga'] || rowObj['nama_pelanggan'] || rowObj['nama'] || '';
+        // Map keys dynamically to match user column variants
+        const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
         const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
         const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
         const mappedAreaCode = rowObj['area_code'] || rowObj['area_desa'] || '';
@@ -209,7 +221,6 @@ export default function PelangganManager({
 
         // Match area based on code or name
         let matchedArea = areas.find(a => a.code.toLowerCase() === mappedAreaCode.toLowerCase() || a.name.toLowerCase().includes(mappedAreaCode.toLowerCase()));
-        
         if (!matchedArea) {
           matchedArea = areas[0]; // fallback to first area
         }
@@ -226,7 +237,7 @@ export default function PelangganManager({
           name: mappedName,
           phone: mappedPhone,
           address: mappedAddress,
-          areaId: matchedArea.id,
+          areaId: matchedArea ? matchedArea.id : (areas[0]?.id || ''),
           wifiStatus: mappedWifi as 'active' | 'inactive',
           plnId: mappedPln,
           pdamId: mappedPdam,
@@ -254,6 +265,16 @@ export default function PelangganManager({
     }
   };
 
+  // Import Customer CSV logic
+  const handleImportCSVSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!csvText.trim()) {
+      setImportError('Teks CSV kosong. Silakan paste baris data.');
+      return;
+    }
+    parseAndImportCSVText(csvText);
+  };
+
   // Import Excel File (.xlsx, .xls, .csv)
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImportError('');
@@ -264,6 +285,25 @@ export default function PelangganManager({
   };
 
   const processExcelFile = (file: File) => {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+
+    // If file is raw CSV, parse as clean text to prevent binary delimiter conversion bugs
+    if (fileExt === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+          parseAndImportCSVText(text);
+        }
+      };
+      reader.onerror = () => {
+        setImportError('Gagal membaca file CSV.');
+      };
+      reader.readAsText(file, 'UTF-8');
+      return;
+    }
+
+    // Process binary Excel file (.xlsx, .xls)
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
@@ -359,10 +399,10 @@ export default function PelangganManager({
   // Download Excel Template for Customers
   const downloadExcelTemplate = () => {
     const templateData = [
-      ['nama_pelanggan', 'no_telp', 'alamat', 'area_code', 'status_wifi', 'id_meter_pln', 'id_sambungan_pdam'],
-      ['Agus Mulyono', '081223344', 'Krajan RT01', 'KRJ', 'Aktif', '531102948999', 'PDAM-KRJ-999'],
-      ['Siti Aminah', '085734455', 'Mulyorejo RT02', 'MLY', 'Nonaktif', '531102948888', ''],
-      ['Ratna Sari', '0813000999', 'Karanganyar RT 01', 'KRG', 'Aktif', '', 'PDAM-KRG-777']
+      ['nama_pelanggan', 'no_telp', 'alamat', 'area_code', 'status_wifi', 'id_meter_pln', 'id_sambungan_pdam', 'nominal_bulanan', 'jatuh_tempo', 'jenis_tagihan'],
+      ['Agus Mulyono', '081223344', 'Krajan RT01', 'KRJ', 'Aktif', '531102948999', 'PDAM-KRJ-999', 150000, 10, 'wifi'],
+      ['Siti Aminah', '085734455', 'Mulyorejo RT02', 'MLY', 'Nonaktif', '531102948888', '', 120000, 15, 'pdam'],
+      ['Ratna Sari', '0813000999', 'Karanganyar RT 01', 'KRG', 'Aktif', '', 'PDAM-KRG-777', 50000, 5, 'pln']
     ];
 
     const wb = XLSX.utils.book_new();
@@ -376,7 +416,10 @@ export default function PelangganManager({
       { wch: 10 }, // area_code
       { wch: 12 }, // status_wifi
       { wch: 18 }, // id_meter_pln
-      { wch: 18 }  // id_sambungan_pdam
+      { wch: 18 }, // id_sambungan_pdam
+      { wch: 16 }, // nominal_bulanan
+      { wch: 12 }, // jatuh_tempo
+      { wch: 15 }  // jenis_tagihan
     ];
     ws['!cols'] = wscols;
 

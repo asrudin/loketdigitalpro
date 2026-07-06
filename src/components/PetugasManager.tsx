@@ -18,6 +18,9 @@ interface PetugasManagerProps {
   onDeleteArea: (id: string) => void;
   onAssignUserArea: (userId: string, areaId: string | undefined) => void;
   onImportPetugas: (data: Omit<User, 'id'>[]) => void;
+  onAddPetugas: (u: Omit<User, 'id'>) => void;
+  onUpdatePetugas: (u: User) => void;
+  onDeletePetugas: (id: string) => void;
 }
 
 export default function PetugasManager({
@@ -27,13 +30,25 @@ export default function PetugasManager({
   onUpdateArea,
   onDeleteArea,
   onAssignUserArea,
-  onImportPetugas
+  onImportPetugas,
+  onAddPetugas,
+  onUpdatePetugas,
+  onDeletePetugas
 }: PetugasManagerProps) {
   // Area form states
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
   const [areaName, setAreaName] = useState('');
   const [areaCode, setAreaCode] = useState('');
   const [editingArea, setEditingArea] = useState<Area | null>(null);
+
+  // User form states
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userUsername, setUserUsername] = useState('');
+  const [userRole, setUserRole] = useState<Role>('kasir');
+  const [userAreaId, setUserAreaId] = useState('');
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userError, setUserError] = useState('');
 
   // Import states
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -139,6 +154,47 @@ export default function PetugasManager({
     setEditingArea(null);
   };
 
+  const handleUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserError('');
+
+    if (!userName.trim() || !userUsername.trim()) {
+      setUserError('Nama dan Username wajib diisi.');
+      return;
+    }
+
+    const cleanUsername = userUsername.trim().toLowerCase();
+
+    // Check if username is valid alphanumeric/underscore
+    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+      setUserError('Username hanya boleh mengandung huruf, angka, dan underscore (_).');
+      return;
+    }
+
+    const userData = {
+      name: userName.trim(),
+      username: cleanUsername,
+      role: userRole,
+      areaId: userRole === 'kasir' ? (userAreaId || undefined) : undefined
+    };
+
+    if (editingUser) {
+      onUpdatePetugas({
+        ...editingUser,
+        ...userData
+      });
+    } else {
+      onAddPetugas(userData);
+    }
+
+    setIsUserModalOpen(false);
+    setUserName('');
+    setUserUsername('');
+    setUserRole('kasir');
+    setUserAreaId('');
+    setEditingUser(null);
+  };
+
   const startEditArea = (a: Area) => {
     setEditingArea(a);
     setAreaName(a.name);
@@ -223,34 +279,95 @@ export default function PetugasManager({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: List of Cashiers & Assigned Areas */}
         <div className="glass-card p-5 rounded-2xl space-y-4">
-          <div>
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">Delegasi Petugas Pembayaran</h2>
-            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Tugaskan kasir pembayaran ke area dusun spesifik agar pencatatan tervalidasi otomatis</p>
+          <div className="flex justify-between items-center pb-2 border-b border-white/5">
+            <div>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Delegasi Petugas Pembayaran</h2>
+              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Tambah, edit, hapus, atau tugaskan petugas ke wilayah kerja spesifik</p>
+            </div>
+            <button
+              id="btn-add-petugas"
+              onClick={() => {
+                setEditingUser(null);
+                setUserName('');
+                setUserUsername('');
+                setUserRole('kasir');
+                setUserAreaId('');
+                setIsUserModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition duration-150 cursor-pointer shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Petugas
+            </button>
           </div>
 
           <div className="space-y-3">
-            {users.filter(u => u.role === 'kasir').map((user) => {
-              const assignedArea = areas.find(a => a.id === user.areaId);
+            {users.map((user) => {
               return (
                 <div key={user.id} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-white block">{user.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono block mt-0.5">Username: {user.username}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">{user.name}</span>
+                      <span className={`px-1.5 py-0.2 text-[9px] font-bold rounded uppercase border ${
+                        user.role === 'admin' 
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' 
+                          : 'bg-blue-500/10 text-blue-300 border-blue-500/20'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono block mt-1">Username: {user.username}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                    <select
-                      id={`assign-area-${user.id}`}
-                      value={user.areaId || ''}
-                      onChange={(e) => onAssignUserArea(user.id, e.target.value || undefined)}
-                      className="text-xs glass-input rounded-lg p-2 focus:outline-none w-full sm:w-auto"
-                    >
-                      <option value="" className="bg-slate-950 text-white">-- Multi-Wilayah (Semua Area) --</option>
-                      {areas.map((a) => (
-                        <option key={a.id} value={a.id} className="bg-slate-950 text-white">{a.name}</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
+                    {user.role === 'kasir' ? (
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3 w-3 text-slate-400" />
+                        <select
+                          id={`assign-area-${user.id}`}
+                          value={user.areaId || ''}
+                          onChange={(e) => onAssignUserArea(user.id, e.target.value || undefined)}
+                          className="text-xs glass-input rounded-lg p-1.5 focus:outline-none w-full sm:w-auto bg-slate-900 text-white"
+                        >
+                          <option value="" className="bg-slate-950 text-white">-- Semua Area --</option>
+                          {areas.map((a) => (
+                            <option key={a.id} value={a.id} className="bg-slate-950 text-white">{a.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-amber-400/80 font-medium italic">Akses Penuh (Admin)</span>
+                    )}
+
+                    <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                      <button
+                        id={`edit-petugas-${user.id}`}
+                        onClick={() => {
+                          setEditingUser(user);
+                          setUserName(user.name);
+                          setUserUsername(user.username);
+                          setUserRole(user.role);
+                          setUserAreaId(user.areaId || '');
+                          setIsUserModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded transition cursor-pointer"
+                        title="Edit Petugas"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        id={`delete-petugas-${user.id}`}
+                        onClick={() => {
+                          if (confirm(`Hapus petugas ${user.name} (${user.username})?`)) {
+                            onDeletePetugas(user.id);
+                          }
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-white/10 rounded transition cursor-pointer"
+                        title="Hapus Petugas"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -374,6 +491,103 @@ export default function PetugasManager({
                   className="px-4 py-2 glass-btn-primary rounded-lg text-xs font-bold cursor-pointer transition"
                 >
                   Simpan Area
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Modal */}
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel-heavy w-full max-w-sm rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                {editingUser ? 'Edit Data Petugas' : 'Tambah Petugas Baru'}
+              </h2>
+              <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-white transition cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUserSubmit} className="p-5 space-y-4">
+              {userError && (
+                <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg flex items-center gap-1.5 animate-pulse">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{userError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Petugas</label>
+                <input
+                  id="user-form-name"
+                  type="text"
+                  required
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="E.g. Budi Santoso"
+                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Username (Untuk Log In)</label>
+                <input
+                  id="user-form-username"
+                  type="text"
+                  required
+                  value={userUsername}
+                  onChange={(e) => setUserUsername(e.target.value)}
+                  placeholder="E.g. budi_santoso"
+                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none lowercase font-mono bg-slate-950 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Peran / Hak Akses</label>
+                <select
+                  id="user-form-role"
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value as Role)}
+                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
+                >
+                  <option value="kasir">Kasir (Akses Penagihan Area)</option>
+                  <option value="admin">Admin (Akses Penuh Sistem)</option>
+                </select>
+              </div>
+
+              {userRole === 'kasir' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tugas Wilayah Area</label>
+                  <select
+                    id="user-form-area"
+                    value={userAreaId}
+                    onChange={(e) => setUserAreaId(e.target.value)}
+                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
+                  >
+                    <option value="">-- Multi-Wilayah (Semua Area) --</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsUserModalOpen(false)}
+                  className="px-4 py-2 bg-white/5 border border-white/5 text-slate-300 rounded-lg text-xs font-bold hover:bg-white/10 cursor-pointer transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 glass-btn-primary rounded-lg text-xs font-bold cursor-pointer transition"
+                >
+                  Simpan Petugas
                 </button>
               </div>
             </form>
