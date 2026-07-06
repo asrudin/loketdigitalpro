@@ -71,6 +71,7 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState<boolean>(false);
   const [cloudConflict, setCloudConflict] = useState<{ local: any, cloud: any } | null>(null);
+  const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
 
   // Latest state ref to avoid stale closures in event listeners
   const stateRef = useRef({ users, areas, pelanggan, tagihan, cashFlow, budgets });
@@ -130,6 +131,7 @@ export default function App() {
             // Document doesn't exist on cloud, seed with current local state
             await saveStateToFirestore(user.uid, stateRef.current);
           }
+          setHasLoadedFromCloud(true);
         } catch (err: any) {
           console.error(err);
           setSyncError('Gagal mengambil data dari Cloud Firestore');
@@ -140,6 +142,7 @@ export default function App() {
       () => {
         setFirebaseUser(null);
         setCloudConflict(null);
+        setHasLoadedFromCloud(false);
       }
     );
     return () => unsubscribe();
@@ -157,7 +160,7 @@ export default function App() {
 
   // Debounced auto sync to Firebase Firestore
   useEffect(() => {
-    if (!firebaseUser || cloudConflict) return;
+    if (!firebaseUser || !hasLoadedFromCloud || cloudConflict) return;
 
     const handler = setTimeout(async () => {
       setSyncing(true);
@@ -182,7 +185,7 @@ export default function App() {
     }, 2500); // 2.5 second debounce for robust saving
 
     return () => clearTimeout(handler);
-  }, [users, areas, pelanggan, tagihan, cashFlow, budgets, firebaseUser, cloudConflict]);
+  }, [users, areas, pelanggan, tagihan, cashFlow, budgets, firebaseUser, cloudConflict, hasLoadedFromCloud]);
 
 
   // 2. State Synchronizers to LocalStorage
