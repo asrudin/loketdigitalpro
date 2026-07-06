@@ -695,6 +695,45 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Cloud Sync Status Indicator */}
+            <div 
+              className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition duration-300 ${
+                syncError 
+                  ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' 
+                  : syncing 
+                    ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                    : !firebaseUser
+                      ? 'text-slate-400 bg-white/5 border-white/5 animate-pulse'
+                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+              }`}
+              title={syncError || (syncing ? 'Sedang menyimpan perubahan ke Firebase...' : !firebaseUser ? 'Menghubungkan ke server Firebase...' : 'Data otomatis tersimpan di Cloud Firebase')}
+            >
+              {syncError ? (
+                <>
+                  <CloudOff className="h-3 w-3 text-rose-400" />
+                  <span>Gagal Sinkron</span>
+                </>
+              ) : syncing ? (
+                <>
+                  <RefreshCw className="h-2.5 w-2.5 animate-spin text-amber-400" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : !firebaseUser ? (
+                <>
+                  <RefreshCw className="h-2.5 w-2.5 animate-spin text-slate-400" />
+                  <span>Menghubungkan...</span>
+                </>
+              ) : (
+                <>
+                  <Cloud className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                  <span className="flex items-center gap-1">
+                    Cloud Aktif
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  </span>
+                </>
+              )}
+            </div>
+
             <div className="text-right">
               <span className="text-[10px] text-slate-400 block font-bold uppercase">Akses Masuk Anda:</span>
               <span className="text-xs font-bold text-slate-200">{currentUser.name}</span>

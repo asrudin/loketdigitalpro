@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, type User } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -32,7 +32,13 @@ export const initAuth = (
     } else {
       cachedAccessToken = null;
       localStorage.removeItem('firebase_cached_drive_token');
-      if (onAuthFailure) onAuthFailure();
+      try {
+        // Automatically sign in anonymously to enable seamless, automated cloud storage
+        await signInAnonymously(auth);
+      } catch (err) {
+        console.error('Failed to sign in anonymously to Firebase:', err);
+        if (onAuthFailure) onAuthFailure();
+      }
     }
   });
 };
