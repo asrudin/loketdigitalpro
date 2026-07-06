@@ -691,7 +691,18 @@ export default function App() {
 
   // 4. View Router
   if (!currentUser) {
-    return <LoginScreen users={users} onLoginSuccess={setCurrentUser} />;
+    return (
+      <LoginScreen 
+        users={users} 
+        areas={areas}
+        onLoginSuccess={setCurrentUser} 
+        onAddPetugas={handleAddPetugas}
+        cloudSyncId={firebaseUser?.uid || ''}
+        onUpdateCloudSyncId={handleUpdateCloudSyncId}
+        syncing={syncing}
+        syncError={syncError}
+      />
+    );
   }
 
   return (
@@ -721,7 +732,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Lokasi Loket:</span>
             <span className="text-xs font-bold text-slate-100 bg-white/10 border border-white/10 px-2.5 py-1 rounded-full">
-              Kantor Balai Desa Sukomaju
+              Kantor Balai Desa Gemblengan
             </span>
           </div>
 

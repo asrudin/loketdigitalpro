@@ -36,7 +36,7 @@ export const initAuth = (
       // Fallback to custom persistent local device ID for seamless automated cloud sync
       let cloudUserId = localStorage.getItem('cloud_user_id');
       if (!cloudUserId) {
-        cloudUserId = 'loket-desa-sukomaju-db';
+        cloudUserId = 'loket-desa-gemblengan-db';
         localStorage.setItem('cloud_user_id', cloudUserId);
       }
       

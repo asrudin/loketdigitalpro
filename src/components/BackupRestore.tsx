@@ -603,7 +603,7 @@ export default function BackupRestore({
                     type="text"
                     value={tempSyncId}
                     onChange={(e) => setTempSyncId(e.target.value)}
-                    placeholder="E.g. loket-desa-sukomaju-db"
+                    placeholder="E.g. loket-desa-gemblengan-db"
                     className="flex-1 text-xs glass-input rounded-lg px-2.5 py-1.5 focus:outline-none font-mono bg-slate-950 text-white border border-white/10"
                   />
                   <button
