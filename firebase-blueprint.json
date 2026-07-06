@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "DatabaseState": {
+      "title": "DatabaseState",
+      "description": "Seluruh data state aplikasi yang disinkronkan ke Firebase",
+      "type": "object",
+      "properties": {
+        "users": { "type": "array", "description": "Daftar petugas/pengguna" },
+        "areas": { "type": "array", "description": "Daftar wilayah/dusun" },
+        "pelanggan": { "type": "array", "description": "Daftar pelanggan" },
+        "tagihan": { "type": "array", "description": "Daftar tagihan" },
+        "cashFlow": { "type": "array", "description": "Arus kas" },
+        "budgets": { "type": "array", "description": "Rencana anggaran" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu sinkronisasi terakhir" }
+      },
+      "required": ["users", "areas", "pelanggan", "tagihan", "cashFlow", "budgets", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/userStates/{userId}": {
+      "schema": "DatabaseState",
+      "description": "Dokumen database state yang diisolasi per pengguna berdasarkan UID"
+    }
+  }
+}

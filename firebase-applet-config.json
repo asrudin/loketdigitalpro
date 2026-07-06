@@ -3,6 +3,7 @@
   "appId": "1:811997316736:web:b91e9de57cd442b28ac865",
   "apiKey": "AIzaSyD8oXDM7BhFL9OTPt8TCPaWxZEuDelKnxY",
   "authDomain": "gen-lang-client-0442342964.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-loketdigitalpro-b01eac28-25e5-405f-bc87-3f538d906d6a",
   "storageBucket": "gen-lang-client-0442342964.firebasestorage.app",
   "messagingSenderId": "811997316736",
   "measurementId": ""

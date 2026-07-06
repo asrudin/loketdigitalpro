@@ -35,6 +35,9 @@ export interface Pelanggan {
   wifiStatus: 'active' | 'inactive';
   plnId: string; // No Meter PLN
   pdamId: string; // No Sambungan PDAM
+  nominalBulanan?: number; // New field: Monthly billing nominal
+  jatuhTempo?: number; // New field: Monthly due date (day of month, e.g. 10)
+  billType?: 'wifi' | 'pln' | 'pdam'; // New field: Bill Type (WIFI, PLN, PDAM)
 }
 
 export type BillType = 'wifi' | 'pln' | 'pdam';

@@ -11,6 +11,11 @@ import {
   saveStoredData 
 } from './data/mockData';
 
+// Firebase Sync and Auth
+import { initAuth, googleSignIn } from './lib/firebase';
+import { saveStateToFirestore, getStateFromFirestore, mergeStates } from './lib/firebaseSync';
+import { type User as FirebaseUser } from 'firebase/auth';
+
 // Component Imports
 import LoginScreen from './components/LoginScreen';
 import Sidebar from './components/Sidebar';
@@ -24,7 +29,7 @@ import PlanningKeuangan from './components/PlanningKeuangan';
 import TemplateSheets from './components/TemplateSheets';
 import BackupRestore from './components/BackupRestore';
 
-import { Shield, Lock } from 'lucide-react';
+import { Shield, Lock, Cloud, CloudOff, RefreshCw, FolderSync } from 'lucide-react';
 
 export default function App() {
   // 1. Core State
@@ -59,6 +64,109 @@ export default function App() {
   const [budgets, setBudgets] = useState<BudgetPlan[]>(() => {
     return loadStoredData<BudgetPlan[]>('budgets', INITIAL_BUDGETS);
   });
+
+  // 1b. Firebase Cloud Sync State
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncSuccess, setSyncSuccess] = useState<boolean>(false);
+  const [cloudConflict, setCloudConflict] = useState<{ local: any, cloud: any } | null>(null);
+
+  // Initialize Auth state
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      async (user) => {
+        setFirebaseUser(user);
+        setSyncing(true);
+        setSyncError(null);
+        try {
+          const cloudState = await getStateFromFirestore(user.uid);
+          if (cloudState) {
+            // Check if there are local differences from default to trigger conflict resolution
+            const hasLocalChanges = 
+              pelanggan.length !== INITIAL_PELANGGAN.length || 
+              tagihan.length !== INITIAL_TAGIHAN.length ||
+              cashFlow.length !== INITIAL_CASH_FLOW.length;
+
+            if (hasLocalChanges) {
+              setCloudConflict({
+                local: { users, areas, pelanggan, tagihan, cashFlow, budgets },
+                cloud: cloudState
+              });
+            } else {
+              // Direct load from cloud
+              setUsers(cloudState.users || INITIAL_USERS);
+              setAreas(cloudState.areas || INITIAL_AREAS);
+              setPelanggan(cloudState.pelanggan || INITIAL_PELANGGAN);
+              setTagihan(cloudState.tagihan || INITIAL_TAGIHAN);
+              setCashFlow(cloudState.cashFlow || INITIAL_CASH_FLOW);
+              setBudgets(cloudState.budgets || INITIAL_BUDGETS);
+            }
+          } else {
+            // Document doesn't exist on cloud, seed with current local state
+            await saveStateToFirestore(user.uid, {
+              users,
+              areas,
+              pelanggan,
+              tagihan,
+              cashFlow,
+              budgets
+            });
+          }
+        } catch (err: any) {
+          console.error(err);
+          setSyncError('Gagal mengambil data dari Cloud Firestore');
+        } finally {
+          setSyncing(false);
+        }
+      },
+      () => {
+        setFirebaseUser(null);
+        setCloudConflict(null);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    setSyncError(null);
+    try {
+      await googleSignIn();
+    } catch (err: any) {
+      console.error(err);
+      setSyncError('Gagal menghubungkan Google Account: ' + (err.message || ''));
+    }
+  };
+
+  // Debounced auto sync to Firebase Firestore
+  useEffect(() => {
+    if (!firebaseUser || cloudConflict) return;
+
+    const handler = setTimeout(async () => {
+      setSyncing(true);
+      setSyncError(null);
+      try {
+        await saveStateToFirestore(firebaseUser.uid, {
+          users,
+          areas,
+          pelanggan,
+          tagihan,
+          cashFlow,
+          budgets
+        });
+        setSyncSuccess(true);
+        setTimeout(() => setSyncSuccess(false), 2000);
+      } catch (err: any) {
+        console.error(err);
+        setSyncError('Gagal sinkronisasi data ke Cloud');
+      } finally {
+        setSyncing(false);
+      }
+    }, 2500); // 2.5 second debounce for robust saving
+
+    return () => clearTimeout(handler);
+  }, [users, areas, pelanggan, tagihan, cashFlow, budgets, firebaseUser, cloudConflict]);
+
 
   // 2. State Synchronizers to LocalStorage
   useEffect(() => {
@@ -526,6 +634,47 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Cloud Sync Status Indicator */}
+            {firebaseUser ? (
+              <div 
+                className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition duration-300 ${
+                  syncError 
+                    ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' 
+                    : syncing 
+                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                }`}
+                title={syncError || (syncing ? 'Sedang menyinkronkan data ke Firebase...' : 'Data Anda sepenuhnya aman di Cloud Firebase')}
+              >
+                {syncError ? (
+                  <>
+                    <CloudOff className="h-3 w-3 text-rose-400" />
+                    <span>Gagal Sinkron</span>
+                  </>
+                ) : syncing ? (
+                  <>
+                    <RefreshCw className="h-2.5 w-2.5 animate-spin text-amber-400" />
+                    <span>Sinkronisasi...</span>
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Cloud Tersinkron</span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <button
+                id="header-btn-connect-cloud"
+                onClick={handleGoogleSignIn}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                title="Hubungkan database dengan akun Google Firebase Anda untuk pencadangan otomatis"
+              >
+                <CloudOff className="h-3.5 w-3.5" />
+                <span>Hubungkan Cloud</span>
+              </button>
+            )}
+
             <div className="text-right">
               <span className="text-[10px] text-slate-400 block font-bold uppercase">Akses Masuk Anda:</span>
               <span className="text-xs font-bold text-slate-200">{currentUser.name}</span>
@@ -641,6 +790,96 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Cloud Sync Conflict Resolution Overlay */}
+      {cloudConflict && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 max-w-lg w-full p-6 rounded-2xl shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="h-12 w-12 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center justify-center text-amber-400">
+              <FolderSync className="h-6 w-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white tracking-tight">Sinkronisasi & Konflik Data Cloud</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Kami mendeteksi data yang tersimpan di Cloud Firebase berbeda dengan data lokal perangkat Anda saat ini. Silakan pilih metode sinkronisasi:
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              {/* Option 1: Merge */}
+              <button
+                onClick={() => {
+                  const merged = mergeStates(cloudConflict.local, cloudConflict.cloud);
+                  setUsers(merged.users);
+                  setAreas(merged.areas);
+                  setPelanggan(merged.pelanggan);
+                  setTagihan(merged.tagihan);
+                  setCashFlow(merged.cashFlow);
+                  setBudgets(merged.budgets);
+                  setCloudConflict(null);
+                  if (firebaseUser) {
+                    saveStateToFirestore(firebaseUser.uid, merged);
+                  }
+                }}
+                className="w-full text-left p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition group cursor-pointer"
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-emerald-300">Gabungkan Data (Sangat Direkomendasikan)</span>
+                  <span className="text-[9px] bg-emerald-500 text-white font-bold px-1.5 py-0.5 rounded uppercase">Rekomendasi</span>
+                </div>
+                <p className="text-[10px] text-emerald-400/80 mt-1 leading-normal">
+                  Menyatukan data lokal dan cloud (pelanggan, transaksi, tagihan) tanpa menghapus apa pun. Duplikasi dieliminasi berdasarkan ID unik.
+                </p>
+              </button>
+
+              {/* Option 2: Cloud Wins */}
+              <button
+                onClick={() => {
+                  const cloud = cloudConflict.cloud;
+                  setUsers(cloud.users || INITIAL_USERS);
+                  setAreas(cloud.areas || INITIAL_AREAS);
+                  setPelanggan(cloud.pelanggan || INITIAL_PELANGGAN);
+                  setTagihan(cloud.tagihan || INITIAL_TAGIHAN);
+                  setCashFlow(cloud.cashFlow || INITIAL_CASH_FLOW);
+                  setBudgets(cloud.budgets || INITIAL_BUDGETS);
+                  setCloudConflict(null);
+                }}
+                className="w-full text-left p-3.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition cursor-pointer"
+              >
+                <span className="text-xs font-bold text-white">Gunakan Data dari Cloud</span>
+                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                  Gunakan data yang tersimpan di Firebase cloud. Data lokal saat ini akan ditimpa sepenuhnya (bagus jika Anda baru pindah perangkat).
+                </p>
+              </button>
+
+              {/* Option 3: Local Wins */}
+              <button
+                onClick={async () => {
+                  const local = cloudConflict.local;
+                  setCloudConflict(null);
+                  if (firebaseUser) {
+                    setSyncing(true);
+                    try {
+                      await saveStateToFirestore(firebaseUser.uid, local);
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setSyncing(false);
+                    }
+                  }
+                }}
+                className="w-full text-left p-3.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition cursor-pointer"
+              >
+                <span className="text-xs font-bold text-white">Gunakan Data Lokal Perangkat</span>
+                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                  Unggah data lokal saat ini dan timpa data di Cloud Firebase dengan data lokal Anda.
+                </p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -47,6 +47,9 @@ export default function PelangganManager({
   const [wifiStatus, setWifiStatus] = useState<'active' | 'inactive'>('active');
   const [plnId, setPlnId] = useState('');
   const [pdamId, setPdamId] = useState('');
+  const [nominalBulanan, setNominalBulanan] = useState<string>('');
+  const [jatuhTempo, setJatuhTempo] = useState<string>('');
+  const [billType, setBillType] = useState<'wifi' | 'pln' | 'pdam'>('wifi');
 
   // Import panel state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -66,6 +69,9 @@ export default function PelangganManager({
     setWifiStatus('active');
     setPlnId('');
     setPdamId('');
+    setNominalBulanan('150000');
+    setJatuhTempo('10');
+    setBillType('wifi');
     setIsModalOpen(true);
   };
 
@@ -79,12 +85,18 @@ export default function PelangganManager({
     setWifiStatus(p.wifiStatus);
     setPlnId(p.plnId);
     setPdamId(p.pdamId);
+    setNominalBulanan(p.nominalBulanan !== undefined ? String(p.nominalBulanan) : '');
+    setJatuhTempo(p.jatuhTempo !== undefined ? String(p.jatuhTempo) : '');
+    setBillType(p.billType || 'wifi');
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !areaId) return;
+
+    const monthlyAmt = nominalBulanan ? parseFloat(nominalBulanan) : undefined;
+    const dueDay = jatuhTempo ? parseInt(jatuhTempo) : undefined;
 
     if (editingPelanggan) {
       onUpdatePelanggan({
@@ -96,6 +108,9 @@ export default function PelangganManager({
         wifiStatus,
         plnId,
         pdamId,
+        nominalBulanan: monthlyAmt,
+        jatuhTempo: dueDay,
+        billType,
       });
     } else {
       onAddPelanggan({
@@ -106,6 +121,9 @@ export default function PelangganManager({
         wifiStatus,
         plnId,
         pdamId,
+        nominalBulanan: monthlyAmt,
+        jatuhTempo: dueDay,
+        billType,
       });
     }
     setIsModalOpen(false);
@@ -200,6 +218,10 @@ export default function PelangganManager({
           throw new Error(`Nama kosong pada baris ke-${i + 1}`);
         }
 
+        const rawNominal = rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
+        const rawTempo = rowObj['jatuh_tempo'] || rowObj['jatuh_tempo_day'] || '';
+        const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
+
         parsedData.push({
           name: mappedName,
           phone: mappedPhone,
@@ -207,7 +229,10 @@ export default function PelangganManager({
           areaId: matchedArea.id,
           wifiStatus: mappedWifi as 'active' | 'inactive',
           plnId: mappedPln,
-          pdamId: mappedPdam
+          pdamId: mappedPdam,
+          nominalBulanan: rawNominal ? parseFloat(rawNominal) : 150000,
+          jatuhTempo: rawTempo ? parseInt(rawTempo) : 10,
+          billType: rawBillType.includes('pln') ? 'pln' : rawBillType.includes('pdam') ? 'pdam' : 'wifi'
         });
       }
 
@@ -291,6 +316,10 @@ export default function PelangganManager({
             continue; // Skip invalid row
           }
 
+          const rawNominal = rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
+          const rawTempo = rowObj['jatuh_tempo'] || rowObj['jatuh_tempo_day'] || '';
+          const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
+
           parsedData.push({
             name: mappedName,
             phone: mappedPhone,
@@ -298,7 +327,10 @@ export default function PelangganManager({
             areaId: matchedArea ? matchedArea.id : (areas[0]?.id || ''),
             wifiStatus: mappedWifi as 'active' | 'inactive',
             plnId: mappedPln,
-            pdamId: mappedPdam
+            pdamId: mappedPdam,
+            nominalBulanan: rawNominal ? parseFloat(rawNominal) : 150000,
+            jatuhTempo: rawTempo ? parseInt(rawTempo) : 10,
+            billType: rawBillType.includes('pln') ? 'pln' : rawBillType.includes('pdam') ? 'pdam' : 'wifi'
           });
         }
 
@@ -500,7 +532,7 @@ export default function PelangganManager({
           {importTab === 'paste' && (
             <form onSubmit={handleImportCSVSubmit} className="space-y-3">
               <p className="text-[11px] text-slate-400 leading-normal font-medium">
-                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam</code>.
+                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan</code>.
               </p>
 
               <textarea
@@ -508,9 +540,9 @@ export default function PelangganManager({
                 rows={4}
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
-                placeholder='nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam
-Agus Mulyono,081223344,Krajan RT01,KRJ,Aktif,531102948999,PDAM-KRJ-999
-Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,'
+                placeholder='nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan
+Agus Mulyono,081223344,Krajan RT01,KRJ,Aktif,531102948999,PDAM-KRJ-999,150000,10,wifi
+Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                 className="w-full font-mono text-xs glass-input rounded-lg p-3 focus:outline-none"
               />
 
@@ -588,7 +620,7 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,'
                 <th className="py-3 px-4">Kode & Nama</th>
                 <th className="py-3 px-4">Dusun / Area</th>
                 <th className="py-3 px-4">No. Telp / Alamat</th>
-                <th className="py-3 px-4 text-center">WiFi</th>
+                <th className="py-3 px-4">Tagihan Bulanan</th>
                 <th className="py-3 px-4">No. Meter PLN</th>
                 <th className="py-3 px-4">No. Sambungan PDAM</th>
                 <th className="py-3 px-4 text-center">Aksi</th>
@@ -615,14 +647,43 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,'
                         <span className="font-bold text-white block">{p.phone}</span>
                         <span className="text-[10px] text-slate-400 block max-w-[150px] truncate font-medium mt-0.5">{p.address}</span>
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                          p.wifiStatus === 'active' 
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold' 
-                            : 'bg-white/5 text-slate-500 border-white/5'
-                        }`}>
-                          {p.wifiStatus === 'active' ? 'Aktif' : 'Off'}
-                        </span>
+                      <td className="py-3 px-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                              (p.billType || 'wifi') === 'wifi'
+                                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-bold'
+                                : (p.billType || 'wifi') === 'pln'
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-bold'
+                                  : 'bg-sky-500/20 text-sky-300 border-sky-500/30 font-bold'
+                            }`}>
+                              {(p.billType || 'wifi').toUpperCase()}
+                            </span>
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                              p.wifiStatus === 'active' 
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                                : 'bg-white/5 text-slate-500 border-white/5'
+                            }`}>
+                              {p.wifiStatus === 'active' ? 'Aktif' : 'Off'}
+                            </span>
+                          </div>
+                          {p.nominalBulanan !== undefined ? (
+                            <span className="text-white font-bold block">
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(p.nominalBulanan)}
+                            </span>
+                          ) : (
+                            <span className="text-white font-bold block">Rp 150.000</span>
+                          )}
+                          {p.jatuhTempo !== undefined ? (
+                            <span className="text-[10px] text-slate-400 block font-medium">
+                              J. Tempo: Tgl {p.jatuhTempo}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 block font-medium">
+                              J. Tempo: Tgl 10
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-300 text-[11px] font-bold">{p.plnId || '-'}</td>
                       <td className="py-3 px-4 font-mono text-slate-300 text-[11px] font-bold">{p.pdamId || '-'}</td>
@@ -723,10 +784,55 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,'
                 />
               </div>
 
-              <div className="border-t border-white/5 pt-3">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Integrasi Utilitas & Tagihan</span>
+              <div className="border-t border-white/5 pt-3 space-y-3">
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Integrasi Utilitas & Tagihan</span>
                 
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* New: Jenis Tagihan Dropdown */}
+                <div>
+                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Jenis Tagihan Utama (WIFI / PLN / PDAM)</label>
+                  <select
+                    id="form-bill-type"
+                    value={billType}
+                    onChange={(e) => setBillType(e.target.value as 'wifi' | 'pln' | 'pdam')}
+                    className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                  >
+                    <option value="wifi" className="bg-slate-950 text-white">WIFI Internet</option>
+                    <option value="pln" className="bg-slate-950 text-white">Listrik PLN</option>
+                    <option value="pdam" className="bg-slate-950 text-white">Air PDAM</option>
+                  </select>
+                </div>
+
+                {/* New: Nominal Bulanan & Jatuh Tempo */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Nominal Bulanan (Rp)</label>
+                    <input
+                      id="form-nominal-bulanan"
+                      type="number"
+                      required
+                      value={nominalBulanan}
+                      onChange={(e) => setNominalBulanan(e.target.value)}
+                      placeholder="150000"
+                      className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Tgl Jatuh Tempo (1-31)</label>
+                    <input
+                      id="form-jatuh-tempo"
+                      type="number"
+                      required
+                      min={1}
+                      max={31}
+                      value={jatuhTempo}
+                      onChange={(e) => setJatuhTempo(e.target.value)}
+                      placeholder="10"
+                      className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Status WiFi Internet</label>
                     <div className="flex gap-2">
