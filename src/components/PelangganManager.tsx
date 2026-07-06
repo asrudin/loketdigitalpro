@@ -10,8 +10,11 @@ import {
   Trash2, 
   X, 
   Check, 
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  UploadCloud
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface PelangganManagerProps {
   pelanggan: Pelanggan[];
@@ -50,6 +53,8 @@ export default function PelangganManager({
   const [csvText, setCsvText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+  const [importTab, setImportTab] = useState<'excel' | 'paste'>('excel');
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Set default form values when opening for adding
   const openAddModal = () => {
@@ -224,6 +229,129 @@ export default function PelangganManager({
     }
   };
 
+  // Import Excel File (.xlsx, .xls, .csv)
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError('');
+    setImportSuccess('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processExcelFile(file);
+  };
+
+  const processExcelFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        // Convert to array of arrays
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        if (data.length < 2) {
+          setImportError('File kosong atau tidak memiliki baris data.');
+          return;
+        }
+
+        // Parse headers (case insensitive and strip whitespace)
+        const headers = data[0].map((h: any) => String(h || '').toLowerCase().trim());
+        const parsedData: Omit<Pelanggan, 'id' | 'code'>[] = [];
+
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || cell === '')) {
+            continue;
+          }
+
+          const rowObj: any = {};
+          headers.forEach((h, index) => {
+            if (h) {
+              rowObj[h] = row[index] !== undefined && row[index] !== null ? String(row[index]).trim() : '';
+            }
+          });
+
+          // Match columns
+          const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
+          const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
+          const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
+          const mappedAreaCode = rowObj['area_code'] || rowObj['area_desa'] || '';
+          const mappedWifi = (rowObj['status_wifi'] || 'active').toLowerCase() === 'active' || (rowObj['status_wifi'] || '').toLowerCase() === 'aktif' ? 'active' : 'inactive';
+          const mappedPln = rowObj['id_meter_pln'] || rowObj['pln_id'] || '';
+          const mappedPdam = rowObj['id_sambungan_pdam'] || rowObj['pdam_id'] || '';
+
+          // Match area
+          let matchedArea = areas.find(a => a.code.toLowerCase() === mappedAreaCode.toLowerCase() || a.name.toLowerCase().includes(mappedAreaCode.toLowerCase()));
+          if (!matchedArea) {
+            matchedArea = areas[0]; // fallback
+          }
+
+          if (!mappedName) {
+            continue; // Skip invalid row
+          }
+
+          parsedData.push({
+            name: mappedName,
+            phone: mappedPhone,
+            address: mappedAddress,
+            areaId: matchedArea ? matchedArea.id : (areas[0]?.id || ''),
+            wifiStatus: mappedWifi as 'active' | 'inactive',
+            plnId: mappedPln,
+            pdamId: mappedPdam
+          });
+        }
+
+        if (parsedData.length === 0) {
+          setImportError('Tidak ada baris data valid yang ditemukan di file Excel.');
+          return;
+        }
+
+        onImportPelanggan(parsedData);
+        setImportSuccess(`Sukses! Berhasil mengimpor ${parsedData.length} data pelanggan baru dari Excel.`);
+        setTimeout(() => {
+          setIsImportOpen(false);
+          setImportSuccess('');
+        }, 2000);
+
+      } catch (err: any) {
+        setImportError('Gagal memproses file Excel: ' + err.message);
+      }
+    };
+    reader.onerror = () => {
+      setImportError('Gagal membaca file.');
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Download Excel Template for Customers
+  const downloadExcelTemplate = () => {
+    const templateData = [
+      ['nama_pelanggan', 'no_telp', 'alamat', 'area_code', 'status_wifi', 'id_meter_pln', 'id_sambungan_pdam'],
+      ['Agus Mulyono', '081223344', 'Krajan RT01', 'KRJ', 'Aktif', '531102948999', 'PDAM-KRJ-999'],
+      ['Siti Aminah', '085734455', 'Mulyorejo RT02', 'MLY', 'Nonaktif', '531102948888', ''],
+      ['Ratna Sari', '0813000999', 'Karanganyar RT 01', 'KRG', 'Aktif', '', 'PDAM-KRG-777']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    
+    // Set column widths so it looks beautiful
+    const wscols = [
+      { wch: 22 }, // nama_pelanggan
+      { wch: 15 }, // no_telp
+      { wch: 25 }, // alamat
+      { wch: 10 }, // area_code
+      { wch: 12 }, // status_wifi
+      { wch: 18 }, // id_meter_pln
+      { wch: 18 }  // id_sambungan_pdam
+    ];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Template_Pelanggan');
+    XLSX.writeFile(wb, 'Template_Impor_Pelanggan.xlsx');
+  };
+
   // Filter list
   const filteredPelanggan = pelanggan.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase());
@@ -267,66 +395,157 @@ export default function PelangganManager({
         </div>
       </div>
 
-      {/* Import CSV Panel Expandable */}
+      {/* Import CSV / Excel Panel Expandable */}
       {isImportOpen && (
-        <div className="glass-card rounded-2xl p-5 shadow-inner space-y-3">
+        <div className="glass-card rounded-2xl p-5 shadow-inner space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Upload className="h-4 w-4 text-indigo-400" />
-              Metode Impor Cepat Data Pelanggan via Paste CSV
+              Metode Impor Cepat Data Pelanggan
             </h3>
             <button onClick={() => setIsImportOpen(false)} className="text-slate-400 hover:text-white transition">
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-            Format kolom baris pertama (Header): <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam</code>.
-            Gunakan kode area desa yang valid (e.g. <span className="font-bold text-white font-mono">KRJ</span>, <span className="font-bold text-white font-mono">MLY</span>, <span className="font-bold text-white font-mono">KRG</span>) pada kolom <code className="font-mono bg-white/10 px-1 rounded text-white">area_code</code>.
-          </p>
+          {/* Import Tabs */}
+          <div className="flex border-b border-white/5 pb-1 gap-4">
+            <button
+              type="button"
+              onClick={() => { setImportTab('excel'); setImportError(''); setImportSuccess(''); }}
+              className={`pb-1.5 text-xs font-bold tracking-wider uppercase border-b-2 transition ${
+                importTab === 'excel'
+                  ? 'border-emerald-400 text-emerald-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Upload Spreadsheet / Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => { setImportTab('paste'); setImportError(''); setImportSuccess(''); }}
+              className={`pb-1.5 text-xs font-bold tracking-wider uppercase border-b-2 transition ${
+                importTab === 'paste'
+                  ? 'border-emerald-400 text-emerald-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Paste Teks CSV / Spreadsheet
+            </button>
+          </div>
 
-          <form onSubmit={handleImportCSVSubmit} className="space-y-3">
-            <textarea
-              id="import-csv-text"
-              rows={4}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder='nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam
+          {/* Tab 1: Excel / Spreadsheet Upload */}
+          {importTab === 'excel' && (
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <p className="text-[11px] text-slate-400 leading-normal font-medium">
+                  Unduh template Excel resmi di samping, isi kolom data pelanggan Anda, lalu seret berkas Anda ke zona di bawah untuk memproses impor instan.
+                </p>
+                <button
+                  type="button"
+                  onClick={downloadExcelTemplate}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold cursor-pointer transition whitespace-nowrap shrink-0"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Unduh Template Excel (.xlsx)
+                </button>
+              </div>
+
+              <div
+                className={`border-2 border-dashed rounded-xl p-8 transition flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  isDragOver 
+                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' 
+                    : 'border-white/10 hover:border-white/20 bg-white/5 text-slate-400'
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  setImportError('');
+                  setImportSuccess('');
+                  const file = e.dataTransfer.files?.[0];
+                  if (!file) return;
+
+                  const fileExt = file.name.split('.').pop()?.toLowerCase();
+                  if (fileExt !== 'xlsx' && fileExt !== 'xls' && fileExt !== 'csv') {
+                    setImportError('Format berkas tidak didukung! Pastikan Anda mengunggah file .xlsx, .xls, atau .csv');
+                    return;
+                  }
+                  processExcelFile(file);
+                }}
+                onClick={() => {
+                  document.getElementById('excel-file-picker')?.click();
+                }}
+              >
+                <UploadCloud className={`h-10 w-10 transition ${isDragOver ? 'text-emerald-400 animate-bounce' : 'text-slate-500'}`} />
+                <p className="text-xs text-white font-bold text-center">Tarik & lepas file Spreadsheet/Excel di sini</p>
+                <p className="text-[10px] text-slate-400 font-semibold text-center">atau klik untuk menelusuri file dari folder lokal (.xlsx, .xls, .csv)</p>
+              </div>
+
+              <input
+                id="excel-file-picker"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleExcelUpload}
+                className="hidden"
+              />
+            </div>
+          )}
+
+          {/* Tab 2: Paste CSV */}
+          {importTab === 'paste' && (
+            <form onSubmit={handleImportCSVSubmit} className="space-y-3">
+              <p className="text-[11px] text-slate-400 leading-normal font-medium">
+                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam</code>.
+              </p>
+
+              <textarea
+                id="import-csv-text"
+                rows={4}
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder='nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam
 Agus Mulyono,081223344,Krajan RT01,KRJ,Aktif,531102948999,PDAM-KRJ-999
 Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,'
-              className="w-full font-mono text-xs glass-input rounded-lg p-3 focus:outline-none"
-            />
+                className="w-full font-mono text-xs glass-input rounded-lg p-3 focus:outline-none"
+              />
 
-            {importError && (
-              <div className="p-2.5 rounded text-xs bg-rose-500/15 text-rose-300 border border-rose-500/20 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-rose-400" />
-                <span className="font-medium">{importError}</span>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCsvText('nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam\nRatna Sari,0813000999,Karanganyar RT 01,KRG,Aktif,531102948777,PDAM-KRG-777')}
+                  className="px-3 py-1.5 bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 hover:bg-white/10 rounded-lg cursor-pointer transition"
+                >
+                  Gunakan Contoh Template
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 glass-btn-primary text-xs rounded-lg cursor-pointer transition"
+                >
+                  Mulai Proses Impor
+                </button>
               </div>
-            )}
+            </form>
+          )}
 
-            {importSuccess && (
-              <div className="p-2.5 rounded text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 flex items-center gap-2">
-                <Check className="h-4 w-4 text-emerald-400" />
-                <span className="font-medium">{importSuccess}</span>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCsvText('nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam\nRatna Sari,0813000999,Karanganyar RT 01,KRG,Aktif,531102948777,PDAM-KRG-777')}
-                className="px-3 py-1.5 bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 hover:bg-white/10 rounded-lg cursor-pointer transition"
-              >
-                Gunakan Contoh Template
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-1.5 glass-btn-primary text-xs rounded-lg cursor-pointer transition"
-              >
-                Mulai Proses Impor
-              </button>
+          {/* Import Messages */}
+          {importError && (
+            <div className="p-3 rounded-xl text-xs bg-rose-500/15 text-rose-300 border border-rose-500/20 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+              <span className="font-semibold">{importError}</span>
             </div>
-          </form>
+          )}
+
+          {importSuccess && (
+            <div className="p-3 rounded-xl text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 flex items-center gap-2">
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span className="font-semibold">{importSuccess}</span>
+            </div>
+          )}
         </div>
       )}
 

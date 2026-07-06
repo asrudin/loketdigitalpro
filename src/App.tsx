@@ -629,6 +629,14 @@ export default function App() {
               onImportBackup={handleImportBackup}
               onResetToDefault={handleResetToDefault}
               onWipeAllData={handleWipeAllData}
+              currentDbState={{
+                users,
+                areas,
+                pelanggan,
+                tagihan,
+                cashFlow,
+                budgets
+              }}
             />
           )}
         </main>
