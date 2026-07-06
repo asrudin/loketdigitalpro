@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Area, Role } from '../types';
 import { 
   Shield, 
@@ -57,11 +57,6 @@ export default function LoginScreen({
   const [regAreaId, setRegAreaId] = useState('');
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState('');
-
-  // Cloud ID Settings Modal States
-  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
-  const [tempCloudId, setTempCloudId] = useState(cloudSyncId);
-  const [isSavingCloudId, setIsSavingCloudId] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,30 +120,16 @@ export default function LoginScreen({
     }, 2000);
   };
 
-  const handleSaveCloudId = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempCloudId.trim()) return;
-    setIsSavingCloudId(true);
-    try {
-      await onUpdateCloudSyncId(tempCloudId.trim());
-      setIsCloudModalOpen(false);
-    } catch (err) {
-      alert('Gagal menyambungkan database cloud.');
-    } finally {
-      setIsSavingCloudId(false);
-    }
-  };
-
   return (
-    <div id="login-container" className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 lg:p-8 relative overflow-hidden select-none text-slate-100">
+    <div id="login-container" className="min-h-screen bg-slate-950/80 flex flex-col justify-center items-center p-4 lg:p-8 relative overflow-hidden select-none text-slate-100">
       {/* Mesh Background */}
-      <div className="absolute inset-0 z-0 opacity-45 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/35 rounded-full blur-[140px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-emerald-500/35 rounded-full blur-[140px]"></div>
-        <div className="absolute top-[25%] right-[20%] w-[40%] h-[40%] bg-purple-600/25 rounded-full blur-[120px]"></div>
+      <div className="absolute inset-0 z-0 opacity-70 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/40 rounded-full blur-[140px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-emerald-500/40 rounded-full blur-[140px]"></div>
+        <div className="absolute top-[25%] right-[20%] w-[40%] h-[40%] bg-purple-600/30 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10 bg-slate-900/30 backdrop-blur-xl rounded-3xl border border-white/10 p-6 lg:p-8 shadow-2xl">
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10 bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 lg:p-8 shadow-2xl">
         
         {/* Left Column: System Showcase (Hidden on Mobile) */}
         <div className="lg:col-span-7 hidden lg:flex flex-col justify-between p-6 rounded-2xl bg-gradient-to-br from-slate-900/80 to-slate-950/40 border border-white/5 relative overflow-hidden">
@@ -214,37 +195,6 @@ export default function LoginScreen({
                 </div>
                 <h4 className="text-xs font-bold text-white">Oto-Sinkronisasi</h4>
                 <p className="text-[10px] text-slate-400 leading-normal">Kolektibilitas kasir tersinkronisasi multi-device ke server cloud.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Metrics Live Mockup */}
-          <div className="border-t border-white/5 pt-6 mt-6">
-            <div className="flex items-center justify-between p-3.5 bg-slate-950/60 rounded-xl border border-white/5">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
-                  <Server className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Server Database</span>
-                  <span className="text-xs font-mono font-bold text-white">{cloudSyncId || 'offline-db'}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTempCloudId(cloudSyncId);
-                    setIsCloudModalOpen(true);
-                  }}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition"
-                  title="Ganti Database ID"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </button>
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                  <CheckCircle className="h-3.5 w-3.5" /> {syncError ? 'OFFLINE' : 'CONNECTED'}
-                </div>
               </div>
             </div>
           </div>
@@ -405,56 +355,6 @@ export default function LoginScreen({
         </div>
 
       </div>
-
-      {/* Cloud DB Setup Modal */}
-      {isCloudModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-panel-heavy w-full max-w-sm rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Database className="h-4 w-4 text-emerald-400" /> Sambungkan Database Cloud
-              </h2>
-              <button onClick={() => setIsCloudModalOpen(false)} className="text-slate-400 hover:text-white transition cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCloudId} className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">ID Sinkronisasi Cloud</label>
-                <input
-                  type="text"
-                  required
-                  value={tempCloudId}
-                  onChange={(e) => setTempCloudId(e.target.value)}
-                  placeholder="E.g. loket-desa-gemblengan-db"
-                  className="w-full text-xs font-mono glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
-                />
-                <p className="text-[9px] text-slate-500 mt-1.5 leading-normal">
-                  Perangkat dengan ID Sinkronisasi yang sama akan otomatis bertukar data pelanggan, tagihan, dan pembayaran secara real-time.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsCloudModalOpen(false)}
-                  className="px-4 py-2 bg-white/5 border border-white/5 text-slate-300 rounded-lg text-xs font-bold hover:bg-white/10 cursor-pointer transition"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingCloudId}
-                  className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold cursor-pointer transition disabled:opacity-50"
-                >
-                  {isSavingCloudId ? 'Menyambungkan...' : 'Sambungkan'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Register Modal */}
       {isRegModalOpen && (

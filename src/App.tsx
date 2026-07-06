@@ -69,7 +69,6 @@ export default function App() {
   const [syncing, setSyncing] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState<boolean>(false);
-  const [cloudConflict, setCloudConflict] = useState<{ local: any, cloud: any } | null>(null);
   const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
 
   // Latest state ref to avoid stale closures in event listeners
@@ -87,42 +86,14 @@ export default function App() {
       if (cloudState) {
         const localState = stateRef.current;
         
-        // Helper to check if local and cloud states are substantively identical
-        const isDataIdentical = (local: any, cloud: any) => {
-          if (local.pelanggan.length !== cloud.pelanggan.length) return false;
-          if (local.tagihan.length !== cloud.tagihan.length) return false;
-          if (local.cashFlow.length !== cloud.cashFlow.length) return false;
-          
-          const localPelId = local.pelanggan.map((p: any) => p.id).sort().join(',');
-          const cloudPelId = cloud.pelanggan.map((p: any) => p.id).sort().join(',');
-          if (localPelId !== cloudPelId) return false;
-          
-          const localTagId = local.tagihan.map((t: any) => t.id).sort().join(',');
-          const cloudTagId = cloud.tagihan.map((t: any) => t.id).sort().join(',');
-          if (localTagId !== cloudTagId) return false;
-
-          return true;
-        };
-
-        const isIdentical = isDataIdentical(localState, cloudState);
-        const isLocalDefault = 
-          localState.pelanggan.length === INITIAL_PELANGGAN.length && 
-          localState.tagihan.length === INITIAL_TAGIHAN.length;
-
-        if (!isIdentical && !isLocalDefault) {
-          setCloudConflict({
-            local: localState,
-            cloud: cloudState
-          });
-        } else {
-          // Direct load from cloud
-          setUsers(cloudState.users || INITIAL_USERS);
-          setAreas(cloudState.areas || INITIAL_AREAS);
-          setPelanggan(cloudState.pelanggan || INITIAL_PELANGGAN);
-          setTagihan(cloudState.tagihan || INITIAL_TAGIHAN);
-          setCashFlow(cloudState.cashFlow || INITIAL_CASH_FLOW);
-          setBudgets(cloudState.budgets || INITIAL_BUDGETS);
-        }
+        // Auto-merge local and cloud states seamlessly
+        const mergedState = mergeStates(localState, cloudState);
+        setUsers(mergedState.users || INITIAL_USERS);
+        setAreas(mergedState.areas || INITIAL_AREAS);
+        setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
+        setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
+        setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
+        setBudgets(mergedState.budgets || INITIAL_BUDGETS);
       } else {
         // Document doesn't exist on cloud, seed with current local state
         await saveStateToFirestore(user.uid, stateRef.current);
@@ -152,7 +123,6 @@ export default function App() {
       },
       () => {
         setFirebaseUser(null);
-        setCloudConflict(null);
         setHasLoadedFromCloud(false);
       }
     );
@@ -172,12 +142,6 @@ export default function App() {
     await loadCloudDataForUser(mockUser);
   };
 
-  // Manual cloud synchronization trigger
-  const handleManualSync = async () => {
-    if (!firebaseUser) return;
-    await loadCloudDataForUser(firebaseUser);
-  };
-
   const handleGoogleSignIn = async () => {
     setSyncError(null);
     try {
@@ -190,7 +154,7 @@ export default function App() {
 
   // Debounced auto sync to Firebase Firestore
   useEffect(() => {
-    if (!firebaseUser || !hasLoadedFromCloud || cloudConflict) return;
+    if (!firebaseUser || !hasLoadedFromCloud) return;
 
     const handler = setTimeout(async () => {
       setSyncing(true);
@@ -212,10 +176,10 @@ export default function App() {
       } finally {
         setSyncing(false);
       }
-    }, 2500); // 2.5 second debounce for robust saving
+    }, 800); // Responsive 800ms debounce for automated, instant cloud saving
 
     return () => clearTimeout(handler);
-  }, [users, areas, pelanggan, tagihan, cashFlow, budgets, firebaseUser, cloudConflict, hasLoadedFromCloud]);
+  }, [users, areas, pelanggan, tagihan, cashFlow, budgets, firebaseUser, hasLoadedFromCloud]);
 
 
   // 2. State Synchronizers to LocalStorage
@@ -706,9 +670,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-950 font-sans text-slate-100 antialiased overflow-hidden relative">
+    <div className="flex h-screen bg-slate-950/80 font-sans text-slate-100 antialiased overflow-hidden relative">
       {/* Mesh Background */}
-      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 z-0 opacity-65 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-500 rounded-full blur-[120px]"></div>
         <div className="absolute top-[20%] right-[10%] w-[30%] h-[40%] bg-purple-600 rounded-full blur-[100px]"></div>
@@ -891,101 +855,10 @@ export default function App() {
               syncing={syncing}
               syncError={syncError}
               syncSuccess={syncSuccess}
-              onManualSync={handleManualSync}
             />
           )}
         </main>
       </div>
-
-      {/* Cloud Sync Conflict Resolution Overlay */}
-      {cloudConflict && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 max-w-lg w-full p-6 rounded-2xl shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            <div className="h-12 w-12 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center justify-center text-amber-400">
-              <FolderSync className="h-6 w-6" />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-white tracking-tight">Sinkronisasi & Konflik Data Cloud</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Kami mendeteksi data yang tersimpan di Cloud Firebase berbeda dengan data lokal perangkat Anda saat ini. Silakan pilih metode sinkronisasi:
-              </p>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              {/* Option 1: Merge */}
-              <button
-                onClick={() => {
-                  const merged = mergeStates(cloudConflict.local, cloudConflict.cloud);
-                  setUsers(merged.users);
-                  setAreas(merged.areas);
-                  setPelanggan(merged.pelanggan);
-                  setTagihan(merged.tagihan);
-                  setCashFlow(merged.cashFlow);
-                  setBudgets(merged.budgets);
-                  setCloudConflict(null);
-                  if (firebaseUser) {
-                    saveStateToFirestore(firebaseUser.uid, merged);
-                  }
-                }}
-                className="w-full text-left p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition group cursor-pointer"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-emerald-300">Gabungkan Data (Sangat Direkomendasikan)</span>
-                  <span className="text-[9px] bg-emerald-500 text-white font-bold px-1.5 py-0.5 rounded uppercase">Rekomendasi</span>
-                </div>
-                <p className="text-[10px] text-emerald-400/80 mt-1 leading-normal">
-                  Menyatukan data lokal dan cloud (pelanggan, transaksi, tagihan) tanpa menghapus apa pun. Duplikasi dieliminasi berdasarkan ID unik.
-                </p>
-              </button>
-
-              {/* Option 2: Cloud Wins */}
-              <button
-                onClick={() => {
-                  const cloud = cloudConflict.cloud;
-                  setUsers(cloud.users || INITIAL_USERS);
-                  setAreas(cloud.areas || INITIAL_AREAS);
-                  setPelanggan(cloud.pelanggan || INITIAL_PELANGGAN);
-                  setTagihan(cloud.tagihan || INITIAL_TAGIHAN);
-                  setCashFlow(cloud.cashFlow || INITIAL_CASH_FLOW);
-                  setBudgets(cloud.budgets || INITIAL_BUDGETS);
-                  setCloudConflict(null);
-                }}
-                className="w-full text-left p-3.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition cursor-pointer"
-              >
-                <span className="text-xs font-bold text-white">Gunakan Data dari Cloud</span>
-                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                  Gunakan data yang tersimpan di Firebase cloud. Data lokal saat ini akan ditimpa sepenuhnya (bagus jika Anda baru pindah perangkat).
-                </p>
-              </button>
-
-              {/* Option 3: Local Wins */}
-              <button
-                onClick={async () => {
-                  const local = cloudConflict.local;
-                  setCloudConflict(null);
-                  if (firebaseUser) {
-                    setSyncing(true);
-                    try {
-                      await saveStateToFirestore(firebaseUser.uid, local);
-                    } catch (e) {
-                      console.error(e);
-                    } finally {
-                      setSyncing(false);
-                    }
-                  }
-                }}
-                className="w-full text-left p-3.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition cursor-pointer"
-              >
-                <span className="text-xs font-bold text-white">Gunakan Data Lokal Perangkat</span>
-                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                  Unggah data lokal saat ini dan timpa data di Cloud Firebase dengan data lokal Anda.
-                </p>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

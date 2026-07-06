@@ -37,7 +37,6 @@ interface BackupRestoreProps {
   syncing: boolean;
   syncError: string | null;
   syncSuccess: boolean;
-  onManualSync: () => Promise<void>;
 }
 
 interface GoogleDriveFile {
@@ -57,13 +56,11 @@ export default function BackupRestore({
   onUpdateCloudSyncId,
   syncing,
   syncError,
-  syncSuccess,
-  onManualSync
+  syncSuccess
 }: BackupRestoreProps) {
   // Cloud Sync state variables
   const [tempSyncId, setTempSyncId] = useState(cloudSyncId);
   const [isSavingId, setIsSavingId] = useState(false);
-  const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   useEffect(() => {
     setTempSyncId(cloudSyncId);
@@ -639,32 +636,10 @@ export default function BackupRestore({
                 </div>
                 <div className="flex justify-between items-center text-[10px]">
                   <span className="text-slate-400">Sinkronisasi Otomatis:</span>
-                  <span className="text-slate-300 font-semibold">Tiap Perubahan (2.5s)</span>
+                  <span className="text-emerald-400 font-bold">Otomatis & Real-time (Debounce)</span>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="border-t border-white/5 pt-4 mt-3">
-            <button
-              type="button"
-              onClick={async () => {
-                setIsManualSyncing(true);
-                try {
-                  await onManualSync();
-                  alert('Sinkronisasi manual berhasil diselesaikan!');
-                } catch (e) {
-                  alert('Gagal melakukan sinkronisasi manual');
-                } finally {
-                  setIsManualSyncing(false);
-                }
-              }}
-              disabled={syncing || isManualSyncing}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${syncing || isManualSyncing ? 'animate-spin' : ''}`} />
-              {syncing || isManualSyncing ? 'Sinkronisasi...' : 'Sinkronkan Sekarang'}
-            </button>
           </div>
         </div>
 
