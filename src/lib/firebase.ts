@@ -32,12 +32,21 @@ export const initAuth = (
     } else {
       cachedAccessToken = null;
       localStorage.removeItem('firebase_cached_drive_token');
-      try {
-        // Automatically sign in anonymously to enable seamless, automated cloud storage
-        await signInAnonymously(auth);
-      } catch (err) {
-        console.error('Failed to sign in anonymously to Firebase:', err);
-        if (onAuthFailure) onAuthFailure();
+      
+      // Fallback to custom persistent local device ID for seamless automated cloud sync
+      let cloudUserId = localStorage.getItem('cloud_user_id');
+      if (!cloudUserId) {
+        cloudUserId = 'loket-device-' + Math.floor(100000000 + Math.random() * 900000000) + '-' + Date.now();
+        localStorage.setItem('cloud_user_id', cloudUserId);
+      }
+      
+      if (onAuthSuccess) {
+        onAuthSuccess({
+          uid: cloudUserId,
+          isAnonymous: true,
+          displayName: 'Loket Digital',
+          email: 'otomatis@loket.digital'
+        } as any, "");
       }
     }
   });
