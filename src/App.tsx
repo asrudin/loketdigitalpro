@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Area, Pelanggan, Tagihan, CashFlow, BudgetPlan, ActiveTab, BillType } from './types';
 import { 
   INITIAL_USERS, 
@@ -72,6 +72,12 @@ export default function App() {
   const [syncSuccess, setSyncSuccess] = useState<boolean>(false);
   const [cloudConflict, setCloudConflict] = useState<{ local: any, cloud: any } | null>(null);
 
+  // Latest state ref to avoid stale closures in event listeners
+  const stateRef = useRef({ users, areas, pelanggan, tagihan, cashFlow, budgets });
+  useEffect(() => {
+    stateRef.current = { users, areas, pelanggan, tagihan, cashFlow, budgets };
+  }, [users, areas, pelanggan, tagihan, cashFlow, budgets]);
+
   // Initialize Auth state
   useEffect(() => {
     const unsubscribe = initAuth(
@@ -82,7 +88,7 @@ export default function App() {
         try {
           const cloudState = await getStateFromFirestore(user.uid);
           if (cloudState) {
-            const localState = { users, areas, pelanggan, tagihan, cashFlow, budgets };
+            const localState = stateRef.current;
             
             // Helper to check if local and cloud states are substantively identical
             const isDataIdentical = (local: any, cloud: any) => {
@@ -103,8 +109,8 @@ export default function App() {
 
             const isIdentical = isDataIdentical(localState, cloudState);
             const isLocalDefault = 
-              pelanggan.length === INITIAL_PELANGGAN.length && 
-              tagihan.length === INITIAL_TAGIHAN.length;
+              localState.pelanggan.length === INITIAL_PELANGGAN.length && 
+              localState.tagihan.length === INITIAL_TAGIHAN.length;
 
             if (!isIdentical && !isLocalDefault) {
               setCloudConflict({
@@ -122,14 +128,7 @@ export default function App() {
             }
           } else {
             // Document doesn't exist on cloud, seed with current local state
-            await saveStateToFirestore(user.uid, {
-              users,
-              areas,
-              pelanggan,
-              tagihan,
-              cashFlow,
-              budgets
-            });
+            await saveStateToFirestore(user.uid, stateRef.current);
           }
         } catch (err: any) {
           console.error(err);
