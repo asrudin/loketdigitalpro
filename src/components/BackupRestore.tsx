@@ -32,6 +32,12 @@ interface BackupRestoreProps {
     cashFlow: any[];
     budgets: any[];
   };
+  cloudSyncId: string;
+  onUpdateCloudSyncId: (newId: string) => Promise<void>;
+  syncing: boolean;
+  syncError: string | null;
+  syncSuccess: boolean;
+  onManualSync: () => Promise<void>;
 }
 
 interface GoogleDriveFile {
@@ -46,8 +52,23 @@ export default function BackupRestore({
   onImportBackup,
   onResetToDefault,
   onWipeAllData,
-  currentDbState
+  currentDbState,
+  cloudSyncId,
+  onUpdateCloudSyncId,
+  syncing,
+  syncError,
+  syncSuccess,
+  onManualSync
 }: BackupRestoreProps) {
+  // Cloud Sync state variables
+  const [tempSyncId, setTempSyncId] = useState(cloudSyncId);
+  const [isSavingId, setIsSavingId] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+
+  useEffect(() => {
+    setTempSyncId(cloudSyncId);
+  }, [cloudSyncId]);
+
   // Local File Backup/Restore state
   const [fileText, setFileText] = useState('');
   const [error, setError] = useState('');
@@ -399,7 +420,7 @@ export default function BackupRestore({
       </div>
 
       {/* Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Column 1: Local Backup Engine */}
         <div className="glass-card p-6 rounded-2xl space-y-5 flex flex-col justify-between">
@@ -558,6 +579,93 @@ export default function BackupRestore({
               Mulai Sinkronisasi Pemulihan (Restore)
             </button>
           </form>
+        </div>
+
+        {/* Column 3: Cloud Firestore Sync Engine */}
+        <div className="glass-card p-6 rounded-2xl space-y-5 flex flex-col justify-between border border-emerald-500/10">
+          <div className="space-y-4">
+            <div className="h-10 w-10 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-center text-emerald-400">
+              <Cloud className="h-5 w-5" />
+            </div>
+
+            <div>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">Sinkronisasi Cloud (Firestore)</h2>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                Hubungkan seluruh perangkat kasir dan admin ke database cloud yang sama secara real-time. Gunakan ID yang sama di perangkat lain agar saling terhubung.
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ID Sinkronisasi Cloud:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tempSyncId}
+                    onChange={(e) => setTempSyncId(e.target.value)}
+                    placeholder="E.g. loket-desa-sukomaju-db"
+                    className="flex-1 text-xs glass-input rounded-lg px-2.5 py-1.5 focus:outline-none font-mono bg-slate-950 text-white border border-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!tempSyncId.trim()) return;
+                      setIsSavingId(true);
+                      try {
+                        await onUpdateCloudSyncId(tempSyncId.trim());
+                        alert('ID Sinkronisasi berhasil diperbarui!');
+                      } catch (e) {
+                        alert('Gagal memperbarui ID Sinkronisasi');
+                      } finally {
+                        setIsSavingId(false);
+                      }
+                    }}
+                    disabled={isSavingId || syncing}
+                    className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingId ? 'Menghubungkan...' : 'Sambungkan'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1.5">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400">Status Jaringan:</span>
+                  {syncError ? (
+                    <span className="text-rose-400 font-bold flex items-center gap-1">❌ offline</span>
+                  ) : (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">🟢 Aktif / Online</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400">Sinkronisasi Otomatis:</span>
+                  <span className="text-slate-300 font-semibold">Tiap Perubahan (2.5s)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-white/5 pt-4 mt-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setIsManualSyncing(true);
+                try {
+                  await onManualSync();
+                  alert('Sinkronisasi manual berhasil diselesaikan!');
+                } catch (e) {
+                  alert('Gagal melakukan sinkronisasi manual');
+                } finally {
+                  setIsManualSyncing(false);
+                }
+              }}
+              disabled={syncing || isManualSyncing}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing || isManualSyncing ? 'animate-spin' : ''}`} />
+              {syncing || isManualSyncing ? 'Sinkronisasi...' : 'Sinkronkan Sekarang'}
+            </button>
+          </div>
         </div>
 
       </div>

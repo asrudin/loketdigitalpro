@@ -78,65 +78,77 @@ export default function App() {
     stateRef.current = { users, areas, pelanggan, tagihan, cashFlow, budgets };
   }, [users, areas, pelanggan, tagihan, cashFlow, budgets]);
 
+  // Load State from Cloud Firestore
+  const loadCloudDataForUser = async (user: FirebaseUser) => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const cloudState = await getStateFromFirestore(user.uid);
+      if (cloudState) {
+        const localState = stateRef.current;
+        
+        // Helper to check if local and cloud states are substantively identical
+        const isDataIdentical = (local: any, cloud: any) => {
+          if (local.pelanggan.length !== cloud.pelanggan.length) return false;
+          if (local.tagihan.length !== cloud.tagihan.length) return false;
+          if (local.cashFlow.length !== cloud.cashFlow.length) return false;
+          
+          const localPelId = local.pelanggan.map((p: any) => p.id).sort().join(',');
+          const cloudPelId = cloud.pelanggan.map((p: any) => p.id).sort().join(',');
+          if (localPelId !== cloudPelId) return false;
+          
+          const localTagId = local.tagihan.map((t: any) => t.id).sort().join(',');
+          const cloudTagId = cloud.tagihan.map((t: any) => t.id).sort().join(',');
+          if (localTagId !== cloudTagId) return false;
+
+          return true;
+        };
+
+        const isIdentical = isDataIdentical(localState, cloudState);
+        const isLocalDefault = 
+          localState.pelanggan.length === INITIAL_PELANGGAN.length && 
+          localState.tagihan.length === INITIAL_TAGIHAN.length;
+
+        if (!isIdentical && !isLocalDefault) {
+          setCloudConflict({
+            local: localState,
+            cloud: cloudState
+          });
+        } else {
+          // Direct load from cloud
+          setUsers(cloudState.users || INITIAL_USERS);
+          setAreas(cloudState.areas || INITIAL_AREAS);
+          setPelanggan(cloudState.pelanggan || INITIAL_PELANGGAN);
+          setTagihan(cloudState.tagihan || INITIAL_TAGIHAN);
+          setCashFlow(cloudState.cashFlow || INITIAL_CASH_FLOW);
+          setBudgets(cloudState.budgets || INITIAL_BUDGETS);
+        }
+      } else {
+        // Document doesn't exist on cloud, seed with current local state
+        await saveStateToFirestore(user.uid, stateRef.current);
+      }
+      setHasLoadedFromCloud(true);
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('offline') || errMsg.includes('Could not reach')) {
+        setSyncError('Koneksi offline. Menunggu jaringan...');
+      } else {
+        setSyncError('Gagal sinkronisasi data dari Cloud Firestore');
+      }
+      // Allow offline/local operation and future auto-syncing attempts
+      setHasLoadedFromCloud(true);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Initialize Auth state
   useEffect(() => {
     const unsubscribe = initAuth(
       async (user) => {
         setFirebaseUser(user);
-        setSyncing(true);
-        setSyncError(null);
-        try {
-          const cloudState = await getStateFromFirestore(user.uid);
-          if (cloudState) {
-            const localState = stateRef.current;
-            
-            // Helper to check if local and cloud states are substantively identical
-            const isDataIdentical = (local: any, cloud: any) => {
-              if (local.pelanggan.length !== cloud.pelanggan.length) return false;
-              if (local.tagihan.length !== cloud.tagihan.length) return false;
-              if (local.cashFlow.length !== cloud.cashFlow.length) return false;
-              
-              const localPelId = local.pelanggan.map((p: any) => p.id).sort().join(',');
-              const cloudPelId = cloud.pelanggan.map((p: any) => p.id).sort().join(',');
-              if (localPelId !== cloudPelId) return false;
-              
-              const localTagId = local.tagihan.map((t: any) => t.id).sort().join(',');
-              const cloudTagId = cloud.tagihan.map((t: any) => t.id).sort().join(',');
-              if (localTagId !== cloudTagId) return false;
-
-              return true;
-            };
-
-            const isIdentical = isDataIdentical(localState, cloudState);
-            const isLocalDefault = 
-              localState.pelanggan.length === INITIAL_PELANGGAN.length && 
-              localState.tagihan.length === INITIAL_TAGIHAN.length;
-
-            if (!isIdentical && !isLocalDefault) {
-              setCloudConflict({
-                local: localState,
-                cloud: cloudState
-              });
-            } else {
-              // Direct load from cloud
-              setUsers(cloudState.users || INITIAL_USERS);
-              setAreas(cloudState.areas || INITIAL_AREAS);
-              setPelanggan(cloudState.pelanggan || INITIAL_PELANGGAN);
-              setTagihan(cloudState.tagihan || INITIAL_TAGIHAN);
-              setCashFlow(cloudState.cashFlow || INITIAL_CASH_FLOW);
-              setBudgets(cloudState.budgets || INITIAL_BUDGETS);
-            }
-          } else {
-            // Document doesn't exist on cloud, seed with current local state
-            await saveStateToFirestore(user.uid, stateRef.current);
-          }
-          setHasLoadedFromCloud(true);
-        } catch (err: any) {
-          console.error(err);
-          setSyncError('Gagal mengambil data dari Cloud Firestore');
-        } finally {
-          setSyncing(false);
-        }
+        await loadCloudDataForUser(user);
       },
       () => {
         setFirebaseUser(null);
@@ -146,6 +158,25 @@ export default function App() {
     );
     return () => unsubscribe();
   }, []);
+
+  // Update cloud sync ID and reload cloud state
+  const handleUpdateCloudSyncId = async (newId: string) => {
+    localStorage.setItem('cloud_user_id', newId);
+    const mockUser = {
+      uid: newId,
+      isAnonymous: true,
+      displayName: 'Loket Digital',
+      email: 'otomatis@loket.digital'
+    } as FirebaseUser;
+    setFirebaseUser(mockUser);
+    await loadCloudDataForUser(mockUser);
+  };
+
+  // Manual cloud synchronization trigger
+  const handleManualSync = async () => {
+    if (!firebaseUser) return;
+    await loadCloudDataForUser(firebaseUser);
+  };
 
   const handleGoogleSignIn = async () => {
     setSyncError(null);
@@ -844,6 +875,12 @@ export default function App() {
                 cashFlow,
                 budgets
               }}
+              cloudSyncId={firebaseUser?.uid || ''}
+              onUpdateCloudSyncId={handleUpdateCloudSyncId}
+              syncing={syncing}
+              syncError={syncError}
+              syncSuccess={syncSuccess}
+              onManualSync={handleManualSync}
             />
           )}
         </main>

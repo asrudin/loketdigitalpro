@@ -64,8 +64,10 @@ export async function saveStateToFirestore(userId: string, state: CloudDbState):
   const docPath = `userStates/${userId}`;
   try {
     const docRef = doc(db, 'userStates', userId);
+    // Sanitize state to remove undefined values which Firestore does not support
+    const sanitizedState = JSON.parse(JSON.stringify(state));
     await setDoc(docRef, {
-      ...state,
+      ...sanitizedState,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
