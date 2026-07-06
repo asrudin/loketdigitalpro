@@ -15,7 +15,7 @@ provider.addScope('https://www.googleapis.com/auth/drive');
 provider.addScope('https://www.googleapis.com/auth/drive.file');
 
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = localStorage.getItem('firebase_cached_drive_token');
 
 // Initialize auth state listener. Call this on app load.
 export const initAuth = (
@@ -24,14 +24,12 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        cachedAccessToken = null;
-        if (onAuthFailure) onAuthFailure();
+      if (onAuthSuccess) {
+        onAuthSuccess(user, cachedAccessToken || "");
       }
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem('firebase_cached_drive_token');
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -48,6 +46,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    localStorage.setItem('firebase_cached_drive_token', cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Sign in error:', error);
@@ -64,4 +63,5 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const logout = async () => {
   await auth.signOut();
   cachedAccessToken = null;
+  localStorage.removeItem('firebase_cached_drive_token');
 };

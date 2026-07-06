@@ -82,15 +82,33 @@ export default function App() {
         try {
           const cloudState = await getStateFromFirestore(user.uid);
           if (cloudState) {
-            // Check if there are local differences from default to trigger conflict resolution
-            const hasLocalChanges = 
-              pelanggan.length !== INITIAL_PELANGGAN.length || 
-              tagihan.length !== INITIAL_TAGIHAN.length ||
-              cashFlow.length !== INITIAL_CASH_FLOW.length;
+            const localState = { users, areas, pelanggan, tagihan, cashFlow, budgets };
+            
+            // Helper to check if local and cloud states are substantively identical
+            const isDataIdentical = (local: any, cloud: any) => {
+              if (local.pelanggan.length !== cloud.pelanggan.length) return false;
+              if (local.tagihan.length !== cloud.tagihan.length) return false;
+              if (local.cashFlow.length !== cloud.cashFlow.length) return false;
+              
+              const localPelId = local.pelanggan.map((p: any) => p.id).sort().join(',');
+              const cloudPelId = cloud.pelanggan.map((p: any) => p.id).sort().join(',');
+              if (localPelId !== cloudPelId) return false;
+              
+              const localTagId = local.tagihan.map((t: any) => t.id).sort().join(',');
+              const cloudTagId = cloud.tagihan.map((t: any) => t.id).sort().join(',');
+              if (localTagId !== cloudTagId) return false;
 
-            if (hasLocalChanges) {
+              return true;
+            };
+
+            const isIdentical = isDataIdentical(localState, cloudState);
+            const isLocalDefault = 
+              pelanggan.length === INITIAL_PELANGGAN.length && 
+              tagihan.length === INITIAL_TAGIHAN.length;
+
+            if (!isIdentical && !isLocalDefault) {
               setCloudConflict({
-                local: { users, areas, pelanggan, tagihan, cashFlow, budgets },
+                local: localState,
                 cloud: cloudState
               });
             } else {
