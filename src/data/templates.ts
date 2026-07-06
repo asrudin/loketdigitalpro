@@ -11,6 +11,9 @@ Kolom:
 - F: ID_METER_PLN (Teks)
 - G: ID_METER_PDAM (Teks)
 - H: STATUS_WIFI (AKTIF/NONAKTIF)
+- I: NOMINAL_BULANAN (Angka)
+- J: JATUH_TEMPO (Angka 1-31)
+- K: JENIS_TAGIHAN (wifi/pln/pdam)
 
 2. Sheet: "Tagihan_Belum_Bayar"
 Kolom:
@@ -90,7 +93,7 @@ function handleAction(params) {
   if (action === "syncPelanggan") {
     const sheet = ss.getSheetByName("Pelanggan") || ss.insertSheet("Pelanggan");
     sheet.clear();
-    sheet.appendRow(["ID_PELANGGAN", "NAMA_PELANGGAN", "NO_TELEPON", "ALAMAT", "AREA_DESA", "ID_METER_PLN", "ID_METER_PDAM", "STATUS_WIFI"]);
+    sheet.appendRow(["ID_PELANGGAN", "NAMA_PELANGGAN", "NO_TELEPON", "ALAMAT", "AREA_DESA", "ID_METER_PLN", "ID_METER_PDAM", "STATUS_WIFI", "NOMINAL_BULANAN", "JATUH_TEMPO", "JENIS_TAGIHAN"]);
     
     params.data.forEach(function(item) {
       sheet.appendRow([
@@ -101,7 +104,10 @@ function handleAction(params) {
         item.area,
         item.plnId,
         item.pdamId,
-        item.wifiStatus
+        item.wifiStatus,
+        item.nominalBulanan || 150000,
+        item.jatuhTempo || 10,
+        item.billType || "wifi"
       ]);
     });
     return { status: "success", message: "Data pelanggan berhasil disinkronkan" };

@@ -592,7 +592,7 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setCsvText('nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam\nRatna Sari,0813000999,Karanganyar RT 01,KRG,Aktif,531102948777,PDAM-KRG-777')}
+                  onClick={() => setCsvText('nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan\nRatna Sari,0813000999,Karanganyar RT 01,KRG,Aktif,,PDAM-KRG-777,150000,10,wifi')}
                   className="px-3 py-1.5 bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 hover:bg-white/10 rounded-lg cursor-pointer transition"
                 >
                   Gunakan Contoh Template
