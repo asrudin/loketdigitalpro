@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -5,15 +6,15 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support both local development config and environment variables for GitHub/Vercel/production support
 const resolvedConfig = {
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey,
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig?.authDomain,
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || firebaseConfig?.projectId,
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig?.storageBucket,
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig?.messagingSenderId,
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || firebaseConfig?.appId,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig?.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig?.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig?.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig?.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig?.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig?.appId,
 };
 
-const customDbId = (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId;
+const customDbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId;
 
 // Initialize Firebase
 const app = initializeApp(resolvedConfig);

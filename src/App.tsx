@@ -142,15 +142,39 @@ export default function App() {
             console.error("Gagal menyimpan hasil merge awal:", e);
           }
         } else {
-          // Real-time collaborative updates: apply cloud state directly to preserve deletions/edits
-          setUsers(cloudState.users || []);
-          setAreas(cloudState.areas || []);
-          setPelanggan(cloudState.pelanggan || []);
-          setTagihan(cloudState.tagihan || []);
-          setCashFlow(cloudState.cashFlow || []);
-          setBudgets(cloudState.budgets || []);
+          // Check if there are local un-saved changes compared to the last synchronized remote state
+          const hasUnsavedChanges = lastRemoteStateRef.current !== null && currentStateStr !== lastRemoteStateRef.current;
+          
+          if (hasUnsavedChanges) {
+            // Merge to preserve both local edits and incoming cloud updates
+            const mergedState = mergeStates(currentState, cloudState);
+            setUsers(mergedState.users || []);
+            setAreas(mergedState.areas || []);
+            setPelanggan(mergedState.pelanggan || []);
+            setTagihan(mergedState.tagihan || []);
+            setCashFlow(mergedState.cashFlow || []);
+            setBudgets(mergedState.budgets || []);
 
-          lastRemoteStateRef.current = cloudStateStr;
+            const mergedStateStr = JSON.stringify(mergedState);
+            lastRemoteStateRef.current = mergedStateStr;
+
+            // Instantly push back the merged state so other clients receive the merge
+            try {
+              await saveStateToFirestore(firebaseUser.uid, mergedState);
+            } catch (e) {
+              console.error("Gagal mengunggah hasil gabungan real-time:", e);
+            }
+          } else {
+            // Apply cloud state directly since we have no pending un-saved changes (allows smooth updates & deletions)
+            setUsers(cloudState.users || []);
+            setAreas(cloudState.areas || []);
+            setPelanggan(cloudState.pelanggan || []);
+            setTagihan(cloudState.tagihan || []);
+            setCashFlow(cloudState.cashFlow || []);
+            setBudgets(cloudState.budgets || []);
+
+            lastRemoteStateRef.current = cloudStateStr;
+          }
         }
 
         setHasLoadedFromCloud(true);
