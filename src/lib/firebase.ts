@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support both local development config and environment variables for GitHub/Vercel/production support
@@ -22,15 +22,18 @@ export const auth = getAuth(app);
 
 let firestoreInstance: any;
 try {
+  const settings = {
+    experimentalForceLongPolling: true,
+  };
   if (customDbId) {
-    firestoreInstance = getFirestore(app, customDbId);
+    firestoreInstance = initializeFirestore(app, settings, customDbId);
   } else {
-    firestoreInstance = getFirestore(app);
+    firestoreInstance = initializeFirestore(app, settings);
   }
 } catch (e) {
   console.error("Failed to initialize custom Firestore database, falling back to default:", e);
   try {
-    firestoreInstance = getFirestore(app);
+    firestoreInstance = initializeFirestore(app, { experimentalForceLongPolling: true });
   } catch (err2) {
     console.error("Failed to initialize default Firestore:", err2);
   }
