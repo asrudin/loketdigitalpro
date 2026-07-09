@@ -37,6 +37,7 @@ interface BackupRestoreProps {
   syncing: boolean;
   syncError: string | null;
   syncSuccess: boolean;
+  onForceSync?: () => Promise<void>;
 }
 
 interface GoogleDriveFile {
@@ -56,7 +57,8 @@ export default function BackupRestore({
   onUpdateCloudSyncId,
   syncing,
   syncError,
-  syncSuccess
+  syncSuccess,
+  onForceSync
 }: BackupRestoreProps) {
   // Cloud Sync state variables
   const [tempSyncId, setTempSyncId] = useState(cloudSyncId);
@@ -646,6 +648,18 @@ export default function BackupRestore({
                   <span className="text-emerald-400 font-bold">Otomatis & Real-time (Debounce)</span>
                 </div>
               </div>
+
+              {onForceSync && (
+                <button
+                  type="button"
+                  onClick={onForceSync}
+                  disabled={syncing}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl text-xs font-bold transition duration-150 disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 text-emerald-400 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+                </button>
+              )}
             </div>
           </div>
         </div>

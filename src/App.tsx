@@ -13,7 +13,7 @@ import {
 
 // Firebase Sync and Auth
 import { initAuth, googleSignIn } from './lib/firebase';
-import { saveStateToFirestore, subscribeStateFromFirestore, mergeStates } from './lib/firebaseSync';
+import { saveStateToFirestore, subscribeStateFromFirestore, mergeStates, getStateFromFirestore } from './lib/firebaseSync';
 import { type User as FirebaseUser } from 'firebase/auth';
 
 // Component Imports
@@ -215,6 +215,53 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       setSyncError('Gagal menghubungkan Google Account: ' + (err.message || ''));
+    }
+  };
+
+  const handleForceSync = async () => {
+    if (!firebaseUser) {
+      alert('Tidak ada koneksi Cloud yang terhubung. Hubungkan ke Cloud terlebih dahulu.');
+      return;
+    }
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const currentState = {
+        users,
+        areas,
+        pelanggan,
+        tagihan,
+        cashFlow,
+        budgets
+      };
+      
+      // 1. First save our local state to Cloud to make sure nothing is lost
+      await saveStateToFirestore(firebaseUser.uid, currentState);
+
+      // 2. Then get the latest state from Firestore to merge back
+      const cloudState = await getStateFromFirestore(firebaseUser.uid);
+      if (cloudState) {
+        const mergedState = mergeStates(currentState, cloudState);
+        setUsers(mergedState.users || INITIAL_USERS);
+        setAreas(mergedState.areas || INITIAL_AREAS);
+        setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
+        setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
+        setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
+        setBudgets(mergedState.budgets || INITIAL_BUDGETS);
+        
+        lastRemoteStateRef.current = JSON.stringify(mergedState);
+      }
+      
+      setSyncSuccess(true);
+      setHasLoadedFromCloud(true);
+      setTimeout(() => setSyncSuccess(false), 2000);
+      alert('Sinkronisasi data manual berhasil! Seluruh data disinkronkan dengan aman ke Cloud.');
+    } catch (err: any) {
+      console.error(err);
+      setSyncError('Gagal sinkronisasi data');
+      alert('Gagal melakukan sinkronisasi data: ' + (err.message || String(err)));
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -784,17 +831,19 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             {/* Cloud Sync Status Indicator */}
-            <div 
-              className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition duration-300 ${
+            <button 
+              onClick={handleForceSync}
+              disabled={syncing || !firebaseUser}
+              className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border transition duration-300 hover:scale-105 active:scale-95 disabled:opacity-75 cursor-pointer ${
                 syncError 
-                  ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' 
+                  ? 'text-rose-400 bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/15' 
                   : syncing 
                     ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
                     : !firebaseUser
                       ? 'text-slate-400 bg-white/5 border-white/5 animate-pulse'
-                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15'
               }`}
-              title={syncError || (syncing ? 'Sedang menyimpan perubahan ke Firebase...' : !firebaseUser ? 'Menghubungkan ke server Firebase...' : 'Data otomatis tersimpan di Cloud Firebase')}
+              title={syncError || (syncing ? 'Sedang menyimpan perubahan ke Firebase...' : !firebaseUser ? 'Menghubungkan ke server Firebase...' : 'Klik untuk sinkronisasi data manual secara real-time')}
             >
               {syncError ? (
                 <>
@@ -815,12 +864,12 @@ export default function App() {
                 <>
                   <Cloud className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
                   <span className="flex items-center gap-1">
-                    Cloud Aktif
+                    Cloud Aktif (Sinkronkan)
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
                   </span>
                 </>
               )}
-            </div>
+            </button>
 
             <div className="text-right">
               <span className="text-[10px] text-slate-400 block font-bold uppercase">Akses Masuk Anda:</span>
@@ -937,6 +986,7 @@ export default function App() {
               syncing={syncing}
               syncError={syncError}
               syncSuccess={syncSuccess}
+              onForceSync={handleForceSync}
             />
           )}
         </main>
