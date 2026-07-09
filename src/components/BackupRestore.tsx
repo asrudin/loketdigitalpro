@@ -88,10 +88,17 @@ export default function BackupRestore({
   useEffect(() => {
     const unsubscribe = initAuth(
       (user, token) => {
-        setIsSignedIn(true);
-        setCurrentUser(user);
-        setAccessToken(token);
-        loadDriveFiles(token);
+        if (user.isAnonymous) {
+          setIsSignedIn(false);
+          setCurrentUser(user);
+          setAccessToken(null);
+          setDriveFiles([]);
+        } else {
+          setIsSignedIn(true);
+          setCurrentUser(user);
+          setAccessToken(token);
+          loadDriveFiles(token);
+        }
       },
       () => {
         setIsSignedIn(false);
