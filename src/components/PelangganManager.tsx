@@ -19,10 +19,10 @@ import * as XLSX from 'xlsx';
 interface PelangganManagerProps {
   pelanggan: Pelanggan[];
   areas: Area[];
-  onAddPelanggan: (p: Omit<Pelanggan, 'id' | 'code'>) => void;
+  onAddPelanggan: (p: Omit<Pelanggan, 'id' | 'code'> & { code?: string }) => void;
   onUpdatePelanggan: (p: Pelanggan) => void;
   onDeletePelanggan: (id: string) => void;
-  onImportPelanggan: (data: Omit<Pelanggan, 'id' | 'code'>[]) => void;
+  onImportPelanggan: (data: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[]) => void;
 }
 
 export default function PelangganManager({
@@ -40,6 +40,7 @@ export default function PelangganManager({
   const [editingPelanggan, setEditingPelanggan] = useState<Pelanggan | null>(null);
 
   // Form states
+  const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -62,6 +63,7 @@ export default function PelangganManager({
   // Set default form values when opening for adding
   const openAddModal = () => {
     setEditingPelanggan(null);
+    setCode('');
     setName('');
     setPhone('');
     setAddress('');
@@ -78,6 +80,7 @@ export default function PelangganManager({
   // Set values when opening for editing
   const openEditModal = (p: Pelanggan) => {
     setEditingPelanggan(p);
+    setCode(p.code);
     setName(p.name);
     setPhone(p.phone);
     setAddress(p.address);
@@ -101,6 +104,7 @@ export default function PelangganManager({
     if (editingPelanggan) {
       onUpdatePelanggan({
         ...editingPelanggan,
+        code: code.trim() || editingPelanggan.code,
         name,
         phone,
         address,
@@ -114,6 +118,7 @@ export default function PelangganManager({
       });
     } else {
       onAddPelanggan({
+        code: code.trim() || undefined,
         name,
         phone,
         address,
@@ -191,7 +196,7 @@ export default function PelangganManager({
 
       // Parse headers
       const headers = firstLine.toLowerCase().split(delimiter).map(h => h.trim().replace(/"/g, ''));
-      const parsedData: Omit<Pelanggan, 'id' | 'code'>[] = [];
+      const parsedData: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         const currentLine = lines[i].trim();
@@ -211,6 +216,7 @@ export default function PelangganManager({
         });
 
         // Map keys dynamically to match user column variants
+        const mappedCode = rowObj['kode_pelanggan'] || rowObj['id_pelanggan'] || rowObj['kode'] || rowObj['id'] || rowObj['kode_pel'] || '';
         const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
         const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
         const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
@@ -234,6 +240,7 @@ export default function PelangganManager({
         const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
 
         parsedData.push({
+          code: mappedCode || undefined,
           name: mappedName,
           phone: mappedPhone,
           address: mappedAddress,
@@ -322,7 +329,7 @@ export default function PelangganManager({
 
         // Parse headers (case insensitive and strip whitespace)
         const headers = data[0].map((h: any) => String(h || '').toLowerCase().trim());
-        const parsedData: Omit<Pelanggan, 'id' | 'code'>[] = [];
+        const parsedData: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[] = [];
 
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
@@ -338,6 +345,7 @@ export default function PelangganManager({
           });
 
           // Match columns
+          const mappedCode = rowObj['kode_pelanggan'] || rowObj['id_pelanggan'] || rowObj['kode'] || rowObj['id'] || rowObj['kode_pel'] || '';
           const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
           const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
           const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
@@ -361,6 +369,7 @@ export default function PelangganManager({
           const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
 
           parsedData.push({
+            code: mappedCode || undefined,
             name: mappedName,
             phone: mappedPhone,
             address: mappedAddress,
@@ -775,17 +784,30 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Pelanggan</label>
-                <input
-                  id="form-name"
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Supardi Purwanto"
-                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kode Pelanggan</label>
+                  <input
+                    id="form-code"
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Otomatis"
+                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none placeholder-slate-500 font-mono"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Pelanggan</label>
+                  <input
+                    id="form-name"
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Supardi Purwanto"
+                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

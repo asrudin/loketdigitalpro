@@ -288,21 +288,12 @@ export default function LoginScreen({
                 Masuk Ke Aplikasi <Key className="h-4 w-4" />
               </button>
             </form>
-          </div>
-
-          {/* Quick Account Selector & Register trigger */}
+            {/* Quick Account Selector */}
           <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Akun Petugas:
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Pilih Akun Petugas:
               </span>
-              <button
-                type="button"
-                onClick={() => setIsRegModalOpen(true)}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 px-2 py-1 rounded-lg transition cursor-pointer"
-              >
-                <UserPlus className="h-3 w-3" /> Tambah Admin / Kasir
-              </button>
             </div>
             
             <div className="grid grid-cols-1 gap-2 max-h-[160px] overflow-y-auto pr-1">
@@ -356,106 +347,7 @@ export default function LoginScreen({
 
       </div>
 
-      {/* Register Modal */}
-      {isRegModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-panel-heavy w-full max-w-sm rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <UserPlus className="h-4 w-4 text-emerald-400" /> Pendaftaran Petugas Baru
-              </h2>
-              <button onClick={() => setIsRegModalOpen(false)} className="text-slate-400 hover:text-white transition cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRegister} className="p-5 space-y-4">
-              {regError && (
-                <div className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg flex items-center gap-1.5 animate-pulse">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{regError}</span>
-                </div>
-              )}
-
-              {regSuccess && (
-                <div className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{regSuccess}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Petugas</label>
-                <input
-                  type="text"
-                  required
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  placeholder="E.g. Andi Pratama"
-                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Username (Untuk Log In)</label>
-                <input
-                  type="text"
-                  required
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  placeholder="E.g. andi_pratama"
-                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none lowercase font-mono bg-slate-950 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Peran / Hak Akses</label>
-                <select
-                  value={regRole}
-                  onChange={(e) => setRegRole(e.target.value as Role)}
-                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
-                >
-                  <option value="kasir">Kasir (Akses Penagihan Area)</option>
-                  <option value="admin">Admin (Akses Penuh Sistem)</option>
-                </select>
-              </div>
-
-              {regRole === 'kasir' && (
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tugas Wilayah Area</label>
-                  <select
-                    value={regAreaId}
-                    onChange={(e) => setRegAreaId(e.target.value)}
-                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none bg-slate-950 text-white"
-                  >
-                    <option value="">-- Multi-Wilayah (Semua Area) --</option>
-                    {areas.map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsRegModalOpen(false)}
-                  className="px-4 py-2 bg-white/5 border border-white/5 text-slate-300 rounded-lg text-xs font-bold hover:bg-white/10 cursor-pointer transition"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold cursor-pointer transition"
-                >
-                  Simpan Petugas
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
+  </div>
   );
 }

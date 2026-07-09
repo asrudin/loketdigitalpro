@@ -295,15 +295,18 @@ export default function App() {
   // 3. Mutation Handlers
 
   // Customers (Pelanggan) CRUD & Bulk Importer
-  const handleAddPelanggan = (p: Omit<Pelanggan, 'id' | 'code'>) => {
-    const areaCode = areas.find(a => a.id === p.areaId)?.code || 'GEN';
-    const num = String(pelanggan.filter(x => x.areaId === p.areaId).length + 1).padStart(3, '0');
-    const newCode = `PLG-${areaCode}-${num}`;
+  const handleAddPelanggan = (p: Omit<Pelanggan, 'id' | 'code'> & { code?: string }) => {
+    let finalCode = p.code?.trim();
+    if (!finalCode) {
+      const areaCode = areas.find(a => a.id === p.areaId)?.code || 'GEN';
+      const num = String(pelanggan.filter(x => x.areaId === p.areaId).length + 1).padStart(3, '0');
+      finalCode = `PLG-${areaCode}-${num}`;
+    }
 
     const newPelanggan: Pelanggan = {
       ...p,
       id: 'plg-' + new Date().getTime() + '-' + Math.floor(Math.random() * 100),
-      code: newCode
+      code: finalCode
     };
     setPelanggan(prev => [newPelanggan, ...prev]);
   };
@@ -318,18 +321,21 @@ export default function App() {
     setTagihan(prev => prev.filter(t => !(t.pelangganId === id && t.status === 'unpaid')));
   };
 
-  const handleImportPelangganList = (importedList: Omit<Pelanggan, 'id' | 'code'>[]) => {
+  const handleImportPelangganList = (importedList: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[]) => {
     setPelanggan(prev => {
       let currentList = [...prev];
       const batchTimestamp = Date.now();
       importedList.forEach((item, index) => {
-        const areaCode = areas.find(a => a.id === item.areaId)?.code || 'GEN';
-        const num = String(currentList.filter(x => x.areaId === item.areaId).length + 1).padStart(3, '0');
-        const code = `PLG-${areaCode}-${num}`;
+        let finalCode = item.code?.trim();
+        if (!finalCode) {
+          const areaCode = areas.find(a => a.id === item.areaId)?.code || 'GEN';
+          const num = String(currentList.filter(x => x.areaId === item.areaId).length + 1).padStart(3, '0');
+          finalCode = `PLG-${areaCode}-${num}`;
+        }
         currentList.push({
           ...item,
           id: `plg-imp-${batchTimestamp}-${index}-${Math.floor(Math.random() * 1000000)}`,
-          code: code
+          code: finalCode
         });
       });
       return currentList;

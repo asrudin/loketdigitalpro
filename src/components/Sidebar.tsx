@@ -36,7 +36,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
     { id: 'pelanggan', label: 'Menu Pelanggan', icon: Users, roles: ['admin'] },
     { id: 'tagihan', label: 'Tagihan Belum Bayar', icon: Receipt, roles: ['admin', 'kasir'] },
     { id: 'pembayaran', label: 'Catat Pembayaran', icon: UserCheck, roles: ['admin', 'kasir'] },
-    { id: 'petugas', label: 'Petugas & Area', icon: MapPin, roles: ['admin'] },
+    { id: 'petugas', label: 'Akun Petugas', icon: MapPin, roles: ['admin'] },
     { id: 'keuangan', label: 'Arus Kas (Masuk/Keluar)', icon: Wallet, roles: ['admin'] },
     { id: 'planning', label: 'Planning Keuangan', icon: TrendingUp, roles: ['admin'] },
     { id: 'backup', label: 'Backup & Restore', icon: Database, roles: ['admin'] },

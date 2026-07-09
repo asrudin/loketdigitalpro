@@ -207,7 +207,7 @@ export default function PetugasManager({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Petugas Lapangan & Area Desa</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight">Akun Petugas & Area Desa</h1>
           <p className="text-xs text-slate-400 mt-0.5 font-medium">Atur wilayah kerja (Dusun) dan delegasikan tugas loket kasir penagihan sesuai area</p>
         </div>
         <button
@@ -297,7 +297,7 @@ export default function PetugasManager({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition duration-150 cursor-pointer shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
-              Petugas
+              Tambah Admin / Kasir
             </button>
           </div>
 
