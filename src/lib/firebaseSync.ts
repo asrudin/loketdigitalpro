@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
 export enum OperationType {
@@ -130,3 +130,46 @@ export function mergeStates(local: CloudDbState, cloud: CloudDbState): CloudDbSt
     budgets: mergeList(local.budgets, cloud.budgets)
   };
 }
+
+/**
+ * Subscribes to real-time state changes from Firestore
+ */
+export function subscribeStateFromFirestore(
+  userId: string,
+  onUpdate: (state: CloudDbState) => void,
+  onError: (error: any) => void
+) {
+  const docPath = `userStates/${userId}`;
+  const docRef = doc(db, 'userStates', userId);
+  return onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        onUpdate({
+          users: data.users || [],
+          areas: data.areas || [],
+          pelanggan: data.pelanggan || [],
+          tagihan: data.tagihan || [],
+          cashFlow: data.cashFlow || [],
+          budgets: data.budgets || []
+        });
+      } else {
+        // Document does not exist yet
+        onUpdate({
+          users: [],
+          areas: [],
+          pelanggan: [],
+          tagihan: [],
+          cashFlow: [],
+          budgets: []
+        });
+      }
+    },
+    (err) => {
+      handleFirestoreError(err, OperationType.GET, docPath);
+      onError(err);
+    }
+  );
+}
+

@@ -13,7 +13,7 @@ import {
 
 // Firebase Sync and Auth
 import { initAuth, googleSignIn } from './lib/firebase';
-import { saveStateToFirestore, getStateFromFirestore, mergeStates } from './lib/firebaseSync';
+import { saveStateToFirestore, subscribeStateFromFirestore, mergeStates } from './lib/firebaseSync';
 import { type User as FirebaseUser } from 'firebase/auth';
 
 // Component Imports
@@ -77,49 +77,14 @@ export default function App() {
     stateRef.current = { users, areas, pelanggan, tagihan, cashFlow, budgets };
   }, [users, areas, pelanggan, tagihan, cashFlow, budgets]);
 
-  // Load State from Cloud Firestore
-  const loadCloudDataForUser = async (user: FirebaseUser) => {
-    setSyncing(true);
-    setSyncError(null);
-    try {
-      const cloudState = await getStateFromFirestore(user.uid);
-      if (cloudState) {
-        const localState = stateRef.current;
-        
-        // Auto-merge local and cloud states seamlessly
-        const mergedState = mergeStates(localState, cloudState);
-        setUsers(mergedState.users || INITIAL_USERS);
-        setAreas(mergedState.areas || INITIAL_AREAS);
-        setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
-        setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
-        setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
-        setBudgets(mergedState.budgets || INITIAL_BUDGETS);
-      } else {
-        // Document doesn't exist on cloud, seed with current local state
-        await saveStateToFirestore(user.uid, stateRef.current);
-      }
-      setHasLoadedFromCloud(true);
-    } catch (err: any) {
-      console.error(err);
-      const errMsg = err?.message || String(err);
-      if (errMsg.includes('offline') || errMsg.includes('Could not reach')) {
-        setSyncError('Koneksi offline. Menunggu jaringan...');
-      } else {
-        setSyncError('Gagal sinkronisasi data dari Cloud Firestore');
-      }
-      // Allow offline/local operation and future auto-syncing attempts
-      setHasLoadedFromCloud(true);
-    } finally {
-      setSyncing(false);
-    }
-  };
+  // Keep track of the last synchronized remote state string to prevent recursive write loops
+  const lastRemoteStateRef = useRef<string | null>(null);
 
   // Initialize Auth state
   useEffect(() => {
     const unsubscribe = initAuth(
       async (user) => {
         setFirebaseUser(user);
-        await loadCloudDataForUser(user);
       },
       () => {
         setFirebaseUser(null);
@@ -128,6 +93,84 @@ export default function App() {
     );
     return () => unsubscribe();
   }, []);
+
+  // Real-time synchronization with Firestore via onSnapshot
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    setSyncing(true);
+    setSyncError(null);
+
+    let isFirstLoad = true;
+
+    const unsubscribe = subscribeStateFromFirestore(
+      firebaseUser.uid,
+      async (cloudState) => {
+        const cloudStateStr = JSON.stringify(cloudState);
+        
+        // Fetch current local state safely via ref
+        const currentState = stateRef.current;
+        const currentStateStr = JSON.stringify(currentState);
+
+        // If the incoming cloud state is identical to our local state representation, skip setting state
+        if (cloudStateStr === currentStateStr) {
+          lastRemoteStateRef.current = cloudStateStr;
+          setSyncing(false);
+          setHasLoadedFromCloud(true);
+          return;
+        }
+
+        if (isFirstLoad) {
+          isFirstLoad = false;
+          // Initial Load: Auto-merge local and cloud states seamlessly
+          const mergedState = mergeStates(currentState, cloudState);
+          
+          setUsers(mergedState.users || INITIAL_USERS);
+          setAreas(mergedState.areas || INITIAL_AREAS);
+          setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
+          setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
+          setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
+          setBudgets(mergedState.budgets || INITIAL_BUDGETS);
+
+          const mergedStateStr = JSON.stringify(mergedState);
+          lastRemoteStateRef.current = mergedStateStr;
+
+          // Push merged state back to cloud instantly so everything is in sync
+          try {
+            await saveStateToFirestore(firebaseUser.uid, mergedState);
+          } catch (e) {
+            console.error("Gagal menyimpan hasil merge awal:", e);
+          }
+        } else {
+          // Real-time collaborative updates: apply cloud state directly to preserve deletions/edits
+          setUsers(cloudState.users || []);
+          setAreas(cloudState.areas || []);
+          setPelanggan(cloudState.pelanggan || []);
+          setTagihan(cloudState.tagihan || []);
+          setCashFlow(cloudState.cashFlow || []);
+          setBudgets(cloudState.budgets || []);
+
+          lastRemoteStateRef.current = cloudStateStr;
+        }
+
+        setHasLoadedFromCloud(true);
+        setSyncing(false);
+      },
+      (err) => {
+        console.error(err);
+        const errMsg = err?.message || String(err);
+        if (errMsg.includes('offline') || errMsg.includes('Could not reach')) {
+          setSyncError('Koneksi offline. Menunggu jaringan...');
+        } else {
+          setSyncError('Gagal sinkronisasi data dari Cloud Firestore');
+        }
+        setHasLoadedFromCloud(true);
+        setSyncing(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [firebaseUser]);
 
   // Update cloud sync ID and reload cloud state
   const handleUpdateCloudSyncId = async (newId: string) => {
@@ -139,7 +182,6 @@ export default function App() {
       email: 'otomatis@loket.digital'
     } as FirebaseUser;
     setFirebaseUser(mockUser);
-    await loadCloudDataForUser(mockUser);
   };
 
   const handleGoogleSignIn = async () => {
@@ -156,18 +198,28 @@ export default function App() {
   useEffect(() => {
     if (!firebaseUser || !hasLoadedFromCloud) return;
 
+    const currentState = {
+      users,
+      areas,
+      pelanggan,
+      tagihan,
+      cashFlow,
+      budgets
+    };
+    const currentStateStr = JSON.stringify(currentState);
+
+    // If local state matches last remote synchronized state, skip saving to prevent infinite updates
+    if (currentStateStr === lastRemoteStateRef.current) {
+      return;
+    }
+
     const handler = setTimeout(async () => {
       setSyncing(true);
       setSyncError(null);
       try {
-        await saveStateToFirestore(firebaseUser.uid, {
-          users,
-          areas,
-          pelanggan,
-          tagihan,
-          cashFlow,
-          budgets
-        });
+        await saveStateToFirestore(firebaseUser.uid, currentState);
+        // Save successfully, update last synchronized representation
+        lastRemoteStateRef.current = currentStateStr;
         setSyncSuccess(true);
         setTimeout(() => setSyncSuccess(false), 2000);
       } catch (err: any) {
