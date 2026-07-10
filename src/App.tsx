@@ -496,6 +496,45 @@ export default function App() {
     setTagihan(prev => prev.filter(t => t.id !== id));
   };
 
+  const handleDeleteTagihanBulk = (ids: string[]) => {
+    setTagihan(prev => prev.filter(t => !ids.includes(t.id)));
+  };
+
+  const handleDeletePembayaranBulk = (ids: string[]) => {
+    const billsToRevert = tagihan.filter(t => ids.includes(t.id) && t.status === 'paid');
+
+    setTagihan(prev => prev.map(t => {
+      if (ids.includes(t.id)) {
+        return {
+          ...t,
+          status: 'unpaid',
+          paidAt: undefined,
+          referenceNo: undefined,
+          officerId: undefined
+        };
+      }
+      return t;
+    }));
+
+    setCashFlow(flowPrev => flowPrev.filter(cf => !cf.referenceId || !ids.includes(cf.referenceId)));
+
+    setBudgets(budgetsPrev => budgetsPrev.map(b => {
+      let refundedAmount = 0;
+      billsToRevert.forEach(t => {
+        const isCategoryMatch = b.category === 'pemasukan';
+        const isPeriodMatch = b.period === 'bulanan';
+        const isNameMatch = b.name.toLowerCase().includes(t.type);
+        if (isCategoryMatch && (isPeriodMatch || isNameMatch)) {
+          refundedAmount += t.amount;
+        }
+      });
+      if (refundedAmount > 0) {
+        return { ...b, spentAmount: Math.max(0, b.spentAmount - refundedAmount) };
+      }
+      return b;
+    }));
+  };
+
   const handlePayTagihanDirectly = (tagihanId: string) => {
     if (!currentUser) return;
     const refNo = 'REF-' + Math.floor(100000 + Math.random() * 900000);
@@ -1029,6 +1068,7 @@ export default function App() {
               onAddTagihanBulk={handleAddTagihanBulk}
               onUpdateTagihan={handleUpdateTagihan}
               onDeleteTagihan={handleDeleteTagihan}
+              onDeleteTagihanBulk={handleDeleteTagihanBulk}
               onPayTagihanDirectly={handlePayTagihanDirectly}
               onImportPembayaran={handleImportPembayaran}
             />
@@ -1042,6 +1082,7 @@ export default function App() {
               users={users}
               currentUser={currentUser}
               onImportPembayaran={handleImportPembayaran}
+              onDeletePembayaranBulk={handleDeletePembayaranBulk}
             />
           )}
 

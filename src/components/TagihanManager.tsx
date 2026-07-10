@@ -27,6 +27,7 @@ interface TagihanManagerProps {
   onAddTagihanBulk: (t: Omit<Tagihan, 'id' | 'status'>[]) => void;
   onUpdateTagihan: (t: Tagihan) => void;
   onDeleteTagihan: (id: string) => void;
+  onDeleteTagihanBulk: (ids: string[]) => void;
   onPayTagihanDirectly: (tagihanId: string) => void;
   onImportPembayaran: (imported: {
     pelangganCodeOrName: string;
@@ -49,10 +50,12 @@ export default function TagihanManager({
   onAddTagihanBulk,
   onUpdateTagihan,
   onDeleteTagihan,
+  onDeleteTagihanBulk,
   onPayTagihanDirectly,
   onImportPembayaran
 }: TagihanManagerProps) {
   // Local states
+  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedArea, setSelectedArea] = useState<string>('all');
   const [selectedOfficer, setSelectedOfficer] = useState<string>('all');
@@ -655,11 +658,64 @@ export default function TagihanManager({
       </div>
 
       {/* Bill List Grid/Table */}
+      {selectedBillIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl gap-3 animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-rose-300 uppercase tracking-wider">Hapus Tagihan Masal / Kolektif</p>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Anda memilih <span className="font-extrabold text-white bg-rose-500/30 px-2 py-0.5 rounded-full text-xs">{selectedBillIds.length}</span> tagihan belum bayar untuk dihapus secara permanen dari database.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={() => setSelectedBillIds([])}
+              className="px-3 py-1.5 border border-white/10 bg-white/5 text-slate-300 hover:text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
+            >
+              Batal Pilih
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Apakah Anda yakin ingin menghapus secara kolektif ${selectedBillIds.length} tagihan belum bayar ini?`)) {
+                  onDeleteTagihanBulk(selectedBillIds);
+                  setSelectedBillIds([]);
+                }
+              }}
+              className="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+            >
+              Hapus Kolektif ({selectedBillIds.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="glass-card rounded-2xl overflow-hidden shadow-lg border border-white/10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white/5">
+                <th className="py-3 px-4 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={filteredUnpaidBills.length > 0 && filteredUnpaidBills.every(t => selectedBillIds.includes(t.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const displayedIds = filteredUnpaidBills.map(t => t.id);
+                        setSelectedBillIds(prev => Array.from(new Set([...prev, ...displayedIds])));
+                      } else {
+                        const displayedIds = filteredUnpaidBills.map(t => t.id);
+                        setSelectedBillIds(prev => prev.filter(id => !displayedIds.includes(id)));
+                      }
+                    }}
+                    className="rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                  />
+                </th>
                 <th className="py-3 px-4">Nama Pelanggan</th>
                 <th className="py-3 px-4">Jenis & Bulan</th>
                 <th className="py-3 px-4">Kode ID Meter / Pelanggan</th>
@@ -671,7 +727,7 @@ export default function TagihanManager({
             <tbody className="divide-y divide-white/5 text-xs text-slate-300">
               {filteredUnpaidBills.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-500 italic font-medium">
+                  <td colSpan={7} className="py-10 text-center text-slate-500 italic font-medium">
                     Semua tagihan lunas! Tidak ada tagihan menunggak yang sesuai filter saat ini.
                   </td>
                 </tr>
@@ -685,6 +741,20 @@ export default function TagihanManager({
 
                   return (
                     <tr key={t.id} className="hover:bg-white/5 transition duration-150">
+                      <td className="py-3.5 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedBillIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBillIds(prev => [...prev, t.id]);
+                            } else {
+                              setSelectedBillIds(prev => prev.filter(id => id !== t.id));
+                            }
+                          }}
+                          className="rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-white block">{plg.name}</span>
                         <span className="text-[10px] text-slate-400 mt-0.5 block font-semibold">{areaName} • {plg.phone}</span>

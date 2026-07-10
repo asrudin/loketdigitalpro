@@ -6,7 +6,9 @@ import {
   X, 
   CheckCircle,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 
 interface PembayaranManagerProps {
@@ -24,6 +26,7 @@ interface PembayaranManagerProps {
     referenceNo: string;
     officerUsername?: string;
   }[]) => void;
+  onDeletePembayaranBulk: (ids: string[]) => void;
 }
 
 export default function PembayaranManager({
@@ -32,11 +35,13 @@ export default function PembayaranManager({
   areas,
   users,
   currentUser,
-  onImportPembayaran
+  onImportPembayaran,
+  onDeletePembayaranBulk
 }: PembayaranManagerProps) {
   // Search and filter
   const [search, setSearch] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<Tagihan | null>(null);
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
 
   // Import states
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -238,11 +243,64 @@ export default function PembayaranManager({
       </div>
 
       {/* Completed Payments Table */}
+      {selectedPaymentIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl gap-3 animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl">
+              <RotateCcw className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-rose-300 uppercase tracking-wider">Batalkan Pembayaran Kolektif</p>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Anda memilih <span className="font-extrabold text-white bg-rose-500/30 px-2 py-0.5 rounded-full text-xs">{selectedPaymentIds.length}</span> transaksi pembayaran untuk dibatalkan. Tagihan ini akan kembali berstatus <span className="font-bold text-rose-400">Belum Bayar</span> dan riwayat kas masuk terkait akan dihapus.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={() => setSelectedPaymentIds([])}
+              className="px-3 py-1.5 border border-white/10 bg-white/5 text-slate-300 hover:text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
+            >
+              Batal Pilih
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Apakah Anda yakin ingin membatalkan/menghapus catatan pembayaran untuk ${selectedPaymentIds.length} transaksi ini? Tagihan akan kembali menjadi BELUM BAYAR.`)) {
+                  onDeletePembayaranBulk(selectedPaymentIds);
+                  setSelectedPaymentIds([]);
+                }
+              }}
+              className="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+            >
+              Batalkan Pembayaran ({selectedPaymentIds.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="glass-card rounded-2xl overflow-hidden shadow-lg border border-white/10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white/5">
+                <th className="py-3 px-4 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={filteredPayments.length > 0 && filteredPayments.every(t => selectedPaymentIds.includes(t.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const displayedIds = filteredPayments.map(t => t.id);
+                        setSelectedPaymentIds(prev => Array.from(new Set([...prev, ...displayedIds])));
+                      } else {
+                        const displayedIds = filteredPayments.map(t => t.id);
+                        setSelectedPaymentIds(prev => prev.filter(id => !displayedIds.includes(id)));
+                      }
+                    }}
+                    className="rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                  />
+                </th>
                 <th className="py-3 px-4">No. Referensi / Tgl</th>
                 <th className="py-3 px-4">Nama Pelanggan</th>
                 <th className="py-3 px-4">Jenis Layanan</th>
@@ -255,7 +313,7 @@ export default function PembayaranManager({
             <tbody className="divide-y divide-white/5 text-xs text-slate-300">
               {filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-500 italic font-medium">
+                  <td colSpan={8} className="py-10 text-center text-slate-500 italic font-medium">
                     Belum ada riwayat pembayaran yang tercatat atau cocok.
                   </td>
                 </tr>
@@ -272,6 +330,20 @@ export default function PembayaranManager({
 
                   return (
                     <tr key={t.id} className="hover:bg-white/5 transition duration-150">
+                      <td className="py-3.5 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedPaymentIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPaymentIds(prev => [...prev, t.id]);
+                            } else {
+                              setSelectedPaymentIds(prev => prev.filter(id => id !== t.id));
+                            }
+                          }}
+                          className="rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3 px-4">
                         <span className="font-mono font-bold text-white text-[11px] block">{t.referenceNo || 'REF-AUTO'}</span>
                         <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">{dateStr}</span>
