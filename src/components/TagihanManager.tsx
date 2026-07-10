@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { read, utils } from 'xlsx';
+import { read, utils, writeFile } from 'xlsx';
 import { Tagihan, Pelanggan, Area, User, BillType } from '../types';
 import { 
   Search, 
@@ -14,7 +14,8 @@ import {
   Edit,
   Trash2,
   Upload,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface TagihanManagerProps {
@@ -114,6 +115,34 @@ export default function TagihanManager({
   const [csvText, setCsvText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+
+  // Download Excel Template for Payments
+  const downloadExcelTemplate = () => {
+    const templateData = [
+      ['id_pelanggan', 'jenis_tagihan', 'periode_bulan', 'jumlah_bayar', 'no_referensi', 'tanggal_bayar', 'petugas_kasir'],
+      ['PLG-KJT-001', 'wifi', '2026-06', 150000, 'REF-883719', '2026-06-15T08:30:00Z', 'kasir_budi'],
+      ['PLG-KRJ-002', 'pln', '2026-06', 45000, 'REF-192837', '2026-06-16T11:15:00Z', 'kasir_ani'],
+      ['PLG-MLY-003', 'pdam', '2026-06', 75000, 'REF-772910', '2026-06-17T09:45:00Z', 'admin_desa']
+    ];
+
+    const wb = utils.book_new();
+    const ws = utils.aoa_to_sheet(templateData);
+    
+    // Set column widths so it looks beautiful
+    const wscols = [
+      { wch: 18 }, // id_pelanggan
+      { wch: 15 }, // jenis_tagihan
+      { wch: 15 }, // periode_bulan
+      { wch: 15 }, // jumlah_bayar
+      { wch: 18 }, // no_referensi
+      { wch: 25 }, // tanggal_bayar
+      { wch: 18 }  // petugas_kasir
+    ];
+    ws['!cols'] = wscols;
+
+    utils.book_append_sheet(wb, ws, 'Template_Pembayaran');
+    writeFile(wb, 'Template_Impor_Pembayaran.xlsx');
+  };
 
   const resolveExcelDate = (val: any) => {
     if (typeof val === 'number') {
@@ -443,6 +472,16 @@ export default function TagihanManager({
                 Format kolom yang direkomendasikan wajib berada di baris pertama:<br/>
                 <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">id_pelanggan, jenis_tagihan, periode_bulan, jumlah_bayar, no_referensi, tanggal_bayar, petugas_kasir</span>
               </p>
+              <div className="mt-2.5">
+                <button
+                  type="button"
+                  onClick={downloadExcelTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Unduh Template Excel Pembayaran (.xlsx)
+                </button>
+              </div>
             </div>
             
             {/* Tab switch */}

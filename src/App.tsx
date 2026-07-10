@@ -460,6 +460,12 @@ export default function App() {
     setTagihan(prev => prev.filter(t => !(t.pelangganId === id && t.status === 'unpaid')));
   };
 
+  const handleDeleteMultiplePelanggan = (ids: string[]) => {
+    setPelanggan(prev => prev.filter(x => !ids.includes(x.id)));
+    // Cascade delete associated unpaid bills
+    setTagihan(prev => prev.filter(t => !(ids.includes(t.pelangganId) && t.status === 'unpaid')));
+  };
+
   const handleImportPelangganList = (importedList: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[]) => {
     setPelanggan(prev => {
       let currentList = [...prev];
@@ -1045,6 +1051,7 @@ export default function App() {
               onAddPelanggan={handleAddPelanggan}
               onUpdatePelanggan={handleUpdatePelanggan}
               onDeletePelanggan={handleDeletePelanggan}
+              onDeleteMultiplePelanggan={handleDeleteMultiplePelanggan}
               onImportPelanggan={handleImportPelangganList}
             />
           )}
