@@ -29,7 +29,7 @@ interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
   onAddPetugas: (u: Omit<User, 'id'>) => void;
   cloudSyncId: string;
-  onUpdateCloudSyncId: (newId: string) => Promise<void>;
+  onUpdateCloudSyncId: (newId: string) => Promise<any>;
   syncing: boolean;
   syncError: string | null;
 }
@@ -353,10 +353,14 @@ export default function LoginScreen({
                           if (!tempSyncId.trim()) return;
                           setIsSavingId(true);
                           try {
-                            await onUpdateCloudSyncId(tempSyncId.trim());
-                            alert('ID Sinkronisasi berhasil diperbarui!');
+                            const res: any = await onUpdateCloudSyncId(tempSyncId.trim());
+                            if (res && res.exists) {
+                              alert(`Koneksi Sukses!\n\nBerhasil mengambil database dari Cloud:\n• Akun Petugas: ${res.userCount}\n• Data Pelanggan: ${res.pelangganCount}\n• Jumlah Tagihan: ${res.tagihanCount}\n• Wilayah Dusun: ${res.areaCount}\n\nSeluruh data berhasil ditarik dan disinkronkan ke perangkat ini secara real-time! Silakan masuk menggunakan salah satu akun kasir/admin yang terdaftar.`);
+                            } else {
+                              alert('Koneksi Sukses!\n\nID Baru berhasil didaftarkan di Cloud. Data awal lokal saat ini telah diunggah ke Cloud sebagai basis database baru Anda.');
+                            }
                           } catch (e) {
-                            alert('Gagal memperbarui ID Sinkronisasi');
+                            alert('Gagal menyambungkan ke ID Database Cloud. Silakan periksa koneksi internet Anda atau coba lagi.');
                           } finally {
                             setIsSavingId(false);
                           }

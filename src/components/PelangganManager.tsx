@@ -142,18 +142,21 @@ export default function PelangganManager({
       return true;
     });
 
-    const headers = ['KODE_PELANGGAN', 'NAMA_PELANGGAN', 'NO_TELP', 'ALAMAT', 'AREA_DESA', 'STATUS_WIFI', 'ID_METER_PLN', 'ID_SAMBUNGAN_PDAM'];
+    const headers = ['KODE_PELANGGAN', 'NAMA_PELANGGAN', 'ALAMAT', 'DUSUN_AREA', 'NO_WA', 'JENIS_TAGIHAN', 'NOMINAL_TAGIHAN', 'JATUH_TEMPO', 'STATUS_WIFI', 'ID_METER_PLN', 'ID_SAMBUNGAN_PDAM'];
     const rows = filteredToExport.map(p => {
       const areaName = areas.find(a => a.id === p.areaId)?.name || 'N/A';
       return [
         p.code,
         `"${p.name.replace(/"/g, '""')}"`,
-        `"${p.phone}"`,
         `"${p.address.replace(/"/g, '""')}"`,
         `"${areaName}"`,
-        p.wifiStatus,
-        `"${p.plnId}"`,
-        `"${p.pdamId}"`
+        `"${p.phone}"`,
+        `"${(p.billType || 'wifi').toUpperCase()}"`,
+        p.nominalBulanan !== undefined ? p.nominalBulanan : 150000,
+        p.jatuhTempo !== undefined ? p.jatuhTempo : 10,
+        p.wifiStatus || 'active',
+        `"${p.plnId || ''}"`,
+        `"${p.pdamId || ''}"`
       ];
     });
 
@@ -218,9 +221,9 @@ export default function PelangganManager({
         // Map keys dynamically to match user column variants
         const mappedCode = rowObj['kode_pelanggan'] || rowObj['id_pelanggan'] || rowObj['kode'] || rowObj['id'] || rowObj['kode_pel'] || '';
         const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
-        const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
+        const mappedPhone = rowObj['no_wa'] || rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
         const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
-        const mappedAreaCode = rowObj['area_code'] || rowObj['area_desa'] || '';
+        const mappedAreaCode = rowObj['dusun_area'] || rowObj['area_code'] || rowObj['area_desa'] || rowObj['dusun'] || '';
         const mappedWifi = (rowObj['status_wifi'] || 'active').toLowerCase() === 'active' || (rowObj['status_wifi'] || '').toLowerCase() === 'aktif' ? 'active' : 'inactive';
         const mappedPln = rowObj['id_meter_pln'] || rowObj['pln_id'] || '';
         const mappedPdam = rowObj['id_sambungan_pdam'] || rowObj['pdam_id'] || '';
@@ -235,7 +238,7 @@ export default function PelangganManager({
           throw new Error(`Nama kosong pada baris ke-${i + 1}`);
         }
 
-        const rawNominal = rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
+        const rawNominal = rowObj['nominal_tagihan'] || rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
         const rawTempo = rowObj['jatuh_tempo'] || rowObj['jatuh_tempo_day'] || '';
         const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
 
@@ -347,9 +350,9 @@ export default function PelangganManager({
           // Match columns
           const mappedCode = rowObj['kode_pelanggan'] || rowObj['id_pelanggan'] || rowObj['kode'] || rowObj['id'] || rowObj['kode_pel'] || '';
           const mappedName = rowObj['nama_pelanggan'] || rowObj['nama_warga'] || rowObj['nama'] || '';
-          const mappedPhone = rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
+          const mappedPhone = rowObj['no_wa'] || rowObj['no_telp'] || rowObj['no_telepon'] || rowObj['phone'] || '';
           const mappedAddress = rowObj['alamat'] || rowObj['address'] || '';
-          const mappedAreaCode = rowObj['area_code'] || rowObj['area_desa'] || '';
+          const mappedAreaCode = rowObj['dusun_area'] || rowObj['area_code'] || rowObj['area_desa'] || rowObj['dusun'] || '';
           const mappedWifi = (rowObj['status_wifi'] || 'active').toLowerCase() === 'active' || (rowObj['status_wifi'] || '').toLowerCase() === 'aktif' ? 'active' : 'inactive';
           const mappedPln = rowObj['id_meter_pln'] || rowObj['pln_id'] || '';
           const mappedPdam = rowObj['id_sambungan_pdam'] || rowObj['pdam_id'] || '';
@@ -364,7 +367,7 @@ export default function PelangganManager({
             continue; // Skip invalid row
           }
 
-          const rawNominal = rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
+          const rawNominal = rowObj['nominal_tagihan'] || rowObj['nominal_bulanan'] || rowObj['nominal'] || '';
           const rawTempo = rowObj['jatuh_tempo'] || rowObj['jatuh_tempo_day'] || '';
           const rawBillType = String(rowObj['jenis_tagihan'] || rowObj['bill_type'] || 'wifi').toLowerCase();
 
@@ -408,10 +411,10 @@ export default function PelangganManager({
   // Download Excel Template for Customers
   const downloadExcelTemplate = () => {
     const templateData = [
-      ['nama_pelanggan', 'no_telp', 'alamat', 'area_code', 'status_wifi', 'id_meter_pln', 'id_sambungan_pdam', 'nominal_bulanan', 'jatuh_tempo', 'jenis_tagihan'],
-      ['Agus Mulyono', '081223344', 'Krajan RT01', 'KRJ', 'Aktif', '531102948999', 'PDAM-KRJ-999', 150000, 10, 'wifi'],
-      ['Siti Aminah', '085734455', 'Mulyorejo RT02', 'MLY', 'Nonaktif', '531102948888', '', 120000, 15, 'pdam'],
-      ['Ratna Sari', '0813000999', 'Karanganyar RT 01', 'KRG', 'Aktif', '', 'PDAM-KRG-777', 50000, 5, 'pln']
+      ['nama_pelanggan', 'alamat', 'area_code', 'no_wa', 'jenis_tagihan', 'nominal_tagihan', 'jatuh_tempo', 'status_wifi', 'id_meter_pln', 'id_sambungan_pdam'],
+      ['Agus Mulyono', 'Krajan RT01', 'KRJ', '081223344', 'WIFI', 150000, 10, 'Aktif', '', ''],
+      ['Siti Aminah', 'Mulyorejo RT02', 'MLY', '085734455', 'PDAM', 75000, 15, 'Nonaktif', '', 'PDAM-MLY-302'],
+      ['Ratna Sari', 'Karanganyar RT 01', 'KRG', '0813000999', 'PLN', 245000, 20, 'Aktif', '531102948220', '']
     ];
 
     const wb = XLSX.utils.book_new();
@@ -420,15 +423,15 @@ export default function PelangganManager({
     // Set column widths so it looks beautiful
     const wscols = [
       { wch: 22 }, // nama_pelanggan
-      { wch: 15 }, // no_telp
       { wch: 25 }, // alamat
       { wch: 10 }, // area_code
+      { wch: 15 }, // no_wa
+      { wch: 15 }, // jenis_tagihan
+      { wch: 16 }, // nominal_tagihan
+      { wch: 12 }, // jatuh_tempo
       { wch: 12 }, // status_wifi
       { wch: 18 }, // id_meter_pln
-      { wch: 18 }, // id_sambungan_pdam
-      { wch: 16 }, // nominal_bulanan
-      { wch: 12 }, // jatuh_tempo
-      { wch: 15 }  // jenis_tagihan
+      { wch: 18 }  // id_sambungan_pdam
     ];
     ws['!cols'] = wscols;
 
@@ -584,7 +587,7 @@ export default function PelangganManager({
           {importTab === 'paste' && (
             <form onSubmit={handleImportCSVSubmit} className="space-y-3">
               <p className="text-[11px] text-slate-400 leading-normal font-medium">
-                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan</code>.
+                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_pelanggan,alamat,area_code,no_wa,jenis_tagihan,nominal_tagihan,jatuh_tempo</code>.
               </p>
 
               <textarea
@@ -592,16 +595,16 @@ export default function PelangganManager({
                 rows={4}
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
-                placeholder='nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan
-Agus Mulyono,081223344,Krajan RT01,KRJ,Aktif,531102948999,PDAM-KRJ-999,150000,10,wifi
-Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
+                placeholder='nama_pelanggan,alamat,area_code,no_wa,jenis_tagihan,nominal_tagihan,jatuh_tempo
+Agus Mulyono,Krajan RT01,KRJ,081223344,WIFI,150000,10
+Siti Aminah,Mulyorejo RT02,MLY,085734455,PDAM,75000,15'
                 className="w-full font-mono text-xs glass-input rounded-lg p-3 focus:outline-none"
               />
 
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setCsvText('nama_pelanggan,no_telp,alamat,area_code,status_wifi,id_meter_pln,id_sambungan_pdam,nominal_bulanan,jatuh_tempo,jenis_tagihan\nRatna Sari,0813000999,Karanganyar RT 01,KRG,Aktif,,PDAM-KRG-777,150000,10,wifi')}
+                  onClick={() => setCsvText('nama_pelanggan,alamat,area_code,no_wa,jenis_tagihan,nominal_tagihan,jatuh_tempo\nRatna Sari,Karanganyar RT 01,KRG,0813000999,PLN,245000,20')}
                   className="px-3 py-1.5 bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 hover:bg-white/10 rounded-lg cursor-pointer transition"
                 >
                   Gunakan Contoh Template
@@ -669,19 +672,20 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white/5">
-                <th className="py-3 px-4">Kode & Nama</th>
+                <th className="py-3 px-4">Nama Pelanggan</th>
+                <th className="py-3 px-4">Alamat Rumah</th>
                 <th className="py-3 px-4">Dusun / Area</th>
-                <th className="py-3 px-4">No. Telp / Alamat</th>
-                <th className="py-3 px-4">Tagihan Bulanan</th>
-                <th className="py-3 px-4">No. Meter PLN</th>
-                <th className="py-3 px-4">No. Sambungan PDAM</th>
+                <th className="py-3 px-4">No. WA</th>
+                <th className="py-3 px-4">Jenis Tagihan</th>
+                <th className="py-3 px-4">Nominal Tagihan</th>
+                <th className="py-3 px-4">Jatuh Tempo</th>
                 <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs text-slate-300">
               {filteredPelanggan.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-500 italic font-medium">
+                  <td colSpan={8} className="py-10 text-center text-slate-500 italic font-medium">
                     Tidak ada data pelanggan yang sesuai dengan kriteria pencarian / filter.
                   </td>
                 </tr>
@@ -694,51 +698,49 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                         <span className="font-bold text-white block">{p.name}</span>
                         <span className="text-[10px] text-slate-400 font-mono block mt-0.5">{p.code}</span>
                       </td>
-                      <td className="py-3 px-4 text-slate-300 font-bold">{areaName}</td>
                       <td className="py-3 px-4">
-                        <span className="font-bold text-white block">{p.phone}</span>
-                        <span className="text-[10px] text-slate-400 block max-w-[150px] truncate font-medium mt-0.5">{p.address}</span>
+                        <span className="text-slate-300 block max-w-[180px] truncate font-medium">{p.address || '-'}</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-300 font-bold">{areaName}</td>
+                      <td className="py-3 px-4 font-bold text-emerald-400">
+                        {p.phone || '-'}
                       </td>
                       <td className="py-3 px-4">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                              (p.billType || 'wifi') === 'wifi'
-                                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-bold'
-                                : (p.billType || 'wifi') === 'pln'
-                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-bold'
-                                  : 'bg-sky-500/20 text-sky-300 border-sky-500/30 font-bold'
-                            }`}>
-                              {(p.billType || 'wifi').toUpperCase()}
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                            (p.billType || 'wifi') === 'wifi'
+                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-bold'
+                              : (p.billType || 'wifi') === 'pln'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-bold'
+                                : 'bg-sky-500/20 text-sky-300 border-sky-500/30 font-bold'
+                          }`}>
+                            {(p.billType || 'wifi').toUpperCase()}
+                          </span>
+                          
+                          {/* Secondary reference details shown compactly inline */}
+                          {(p.billType || 'wifi') === 'wifi' && p.wifiStatus && (
+                            <span className="text-[9px] text-slate-400 block font-medium">
+                              WiFi: {p.wifiStatus === 'active' ? 'Aktif' : 'Nonaktif'}
                             </span>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                              p.wifiStatus === 'active' 
-                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
-                                : 'bg-white/5 text-slate-500 border-white/5'
-                            }`}>
-                              {p.wifiStatus === 'active' ? 'Aktif' : 'Off'}
-                            </span>
-                          </div>
-                          {p.nominalBulanan !== undefined ? (
-                            <span className="text-white font-bold block">
-                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(p.nominalBulanan)}
-                            </span>
-                          ) : (
-                            <span className="text-white font-bold block">Rp 150.000</span>
                           )}
-                          {p.jatuhTempo !== undefined ? (
-                            <span className="text-[10px] text-slate-400 block font-medium">
-                              J. Tempo: Tgl {p.jatuhTempo}
+                          {(p.billType || 'wifi') === 'pln' && p.plnId && (
+                            <span className="text-[9px] text-slate-400 font-mono block">
+                              Meter: {p.plnId}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 block font-medium">
-                              J. Tempo: Tgl 10
+                          )}
+                          {(p.billType || 'wifi') === 'pdam' && p.pdamId && (
+                            <span className="text-[9px] text-slate-400 font-mono block">
+                              Samb: {p.pdamId}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-300 text-[11px] font-bold">{p.plnId || '-'}</td>
-                      <td className="py-3 px-4 font-mono text-slate-300 text-[11px] font-bold">{p.pdamId || '-'}</td>
+                      <td className="py-3 px-4 font-bold text-white">
+                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(p.nominalBulanan !== undefined ? p.nominalBulanan : 150000)}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-300">
+                        Tgl {p.jatuhTempo !== undefined ? p.jatuhTempo : 10}
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
@@ -786,7 +788,7 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kode Pelanggan</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kode Pelg</label>
                   <input
                     id="form-code"
                     type="text"
@@ -797,7 +799,7 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Pelanggan</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap Pelanggan *</label>
                   <input
                     id="form-name"
                     type="text"
@@ -812,10 +814,11 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">No. Handphone (WA)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">No. WA (WhatsApp) *</label>
                   <input
                     id="form-phone"
                     type="text"
+                    required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="08123456789"
@@ -823,7 +826,7 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Dusun / Area Desa</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Dusun / Area *</label>
                   <select
                     id="form-area"
                     value={areaId}
@@ -838,10 +841,11 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alamat Rumah Lengkap</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alamat Lengkap *</label>
                 <textarea
                   id="form-address"
                   rows={2}
+                  required
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Jl. Merdeka No. 12, RT 01 RW 02"
@@ -850,16 +854,22 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
               </div>
 
               <div className="border-t border-white/5 pt-3 space-y-3">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Integrasi Utilitas & Tagihan</span>
+                <span className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Pengaturan Tagihan Utama</span>
                 
-                {/* New: Jenis Tagihan Dropdown */}
+                {/* Jenis Tagihan Dropdown */}
                 <div>
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Jenis Tagihan Utama (WIFI / PLN / PDAM)</label>
+                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Jenis Tagihan Utama *</label>
                   <select
                     id="form-bill-type"
                     value={billType}
-                    onChange={(e) => setBillType(e.target.value as 'wifi' | 'pln' | 'pdam')}
-                    className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                    onChange={(e) => {
+                      const type = e.target.value as 'wifi' | 'pln' | 'pdam';
+                      setBillType(type);
+                      if (type === 'wifi') setNominalBulanan('150000');
+                      else if (type === 'pln') setNominalBulanan('200000');
+                      else if (type === 'pdam') setNominalBulanan('50000');
+                    }}
+                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
                   >
                     <option value="wifi" className="bg-slate-950 text-white">WIFI Internet</option>
                     <option value="pln" className="bg-slate-950 text-white">Listrik PLN</option>
@@ -867,10 +877,10 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                   </select>
                 </div>
 
-                {/* New: Nominal Bulanan & Jatuh Tempo */}
+                {/* Nominal Bulanan & Jatuh Tempo */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Nominal Bulanan (Rp)</label>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Nominal Tagihan (Rp) *</label>
                     <input
                       id="form-nominal-bulanan"
                       type="number"
@@ -878,11 +888,11 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                       value={nominalBulanan}
                       onChange={(e) => setNominalBulanan(e.target.value)}
                       placeholder="150000"
-                      className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Tgl Jatuh Tempo (1-31)</label>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Tanggal Jatuh Tempo (1-31) *</label>
                     <input
                       id="form-jatuh-tempo"
                       type="number"
@@ -892,63 +902,68 @@ Siti Aminah,085734455,Mulyorejo RT02,MLY,Nonaktif,531102948888,,120000,15,pdam'
                       value={jatuhTempo}
                       onChange={(e) => setJatuhTempo(e.target.value)}
                       placeholder="10"
-                      className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Status WiFi Internet</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setWifiStatus('active')}
-                        className={`flex-1 text-[10px] font-bold py-1.5 px-2 rounded-lg border text-center cursor-pointer transition ${
-                          wifiStatus === 'active'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                            : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
-                        }`}
-                      >
-                        Aktif
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setWifiStatus('inactive')}
-                        className={`flex-1 text-[10px] font-bold py-1.5 px-2 rounded-lg border text-center cursor-pointer transition ${
-                          wifiStatus === 'inactive'
-                            ? 'bg-white/5 text-slate-300 border-white/10'
-                            : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
-                        }`}
-                      >
-                        Nonaktif
-                      </button>
+                {/* Collapsible/Compact additional data references to keep things extremely clean */}
+                <div className="border-t border-white/5 pt-3 space-y-3">
+                  <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Detail Referensi ID (Opsional)</span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Status WiFi</label>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setWifiStatus('active')}
+                          className={`flex-1 text-[9px] font-bold py-1 px-1.5 rounded border text-center cursor-pointer transition ${
+                            wifiStatus === 'active'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                          }`}
+                        >
+                          Aktif
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWifiStatus('inactive')}
+                          className={`flex-1 text-[9px] font-bold py-1 px-1.5 rounded border text-center cursor-pointer transition ${
+                            wifiStatus === 'inactive'
+                              ? 'bg-white/5 text-slate-300 border-white/10'
+                              : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                          }`}
+                        >
+                          Off
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">No. Sambungan PDAM</label>
+                      <input
+                        id="form-pdam"
+                        type="text"
+                        value={pdamId}
+                        onChange={(e) => setPdamId(e.target.value)}
+                        placeholder="PDAM-KRJ-000"
+                        className="w-full text-[11px] glass-input rounded p-1.5 focus:outline-none"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">No. Sambungan PDAM</label>
+                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">ID Pelanggan Listrik PLN</label>
                     <input
-                      id="form-pdam"
+                      id="form-pln"
                       type="text"
-                      value={pdamId}
-                      onChange={(e) => setPdamId(e.target.value)}
-                      placeholder="PDAM-KRJ-000"
-                      className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
+                      value={plnId}
+                      onChange={(e) => setPlnId(e.target.value)}
+                      placeholder="53110294xxxx"
+                      className="w-full text-[11px] glass-input rounded p-1.5 focus:outline-none font-mono"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">ID Pelanggan Listrik PLN (12 Digit)</label>
-                  <input
-                    id="form-pln"
-                    type="text"
-                    value={plnId}
-                    onChange={(e) => setPlnId(e.target.value)}
-                    placeholder="5311xxxxxxxx"
-                    className="w-full text-xs glass-input rounded-lg p-2 focus:outline-none"
-                  />
                 </div>
               </div>
 

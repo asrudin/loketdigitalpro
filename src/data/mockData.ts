@@ -23,7 +23,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-1',
     wifiStatus: 'active',
     plnId: '531102948110',
-    pdamId: 'PDAM-KRJ-204'
+    pdamId: 'PDAM-KRJ-204',
+    billType: 'wifi',
+    nominalBulanan: 150000,
+    jatuhTempo: 10
   },
   {
     id: 'plg-2',
@@ -34,7 +37,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-1',
     wifiStatus: 'active',
     plnId: '531102948111',
-    pdamId: 'PDAM-KRJ-205'
+    pdamId: 'PDAM-KRJ-205',
+    billType: 'wifi',
+    nominalBulanan: 150000,
+    jatuhTempo: 10
   },
   {
     id: 'plg-3',
@@ -45,7 +51,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-2',
     wifiStatus: 'inactive',
     plnId: '531102948220',
-    pdamId: 'PDAM-MLY-301'
+    pdamId: 'PDAM-MLY-301',
+    billType: 'pln',
+    nominalBulanan: 245000,
+    jatuhTempo: 20
   },
   {
     id: 'plg-4',
@@ -56,7 +65,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-3',
     wifiStatus: 'active',
     plnId: '531102948330',
-    pdamId: 'PDAM-KRG-401'
+    pdamId: 'PDAM-KRG-401',
+    billType: 'wifi',
+    nominalBulanan: 150000,
+    jatuhTempo: 10
   },
   {
     id: 'plg-5',
@@ -67,7 +79,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-4',
     wifiStatus: 'active',
     plnId: '531102948440',
-    pdamId: 'PDAM-SDG-501'
+    pdamId: 'PDAM-SDG-501',
+    billType: 'wifi',
+    nominalBulanan: 150000,
+    jatuhTempo: 10
   },
   {
     id: 'plg-6',
@@ -78,7 +93,10 @@ export const INITIAL_PELANGGAN: Pelanggan[] = [
     areaId: 'area-2',
     wifiStatus: 'active',
     plnId: '531102948222',
-    pdamId: 'PDAM-MLY-302'
+    pdamId: 'PDAM-MLY-302',
+    billType: 'pdam',
+    nominalBulanan: 75000,
+    jatuhTempo: 25
   }
 ];
 

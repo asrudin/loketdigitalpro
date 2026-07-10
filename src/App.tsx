@@ -198,13 +198,80 @@ export default function App() {
   // Update cloud sync ID and reload cloud state
   const handleUpdateCloudSyncId = async (newId: string) => {
     localStorage.setItem('cloud_user_id', newId);
-    const mockUser = {
-      uid: newId,
-      isAnonymous: true,
-      displayName: 'Loket Digital',
-      email: 'otomatis@loket.digital'
-    } as FirebaseUser;
-    setFirebaseUser(mockUser);
+    setSyncing(true);
+    setSyncError(null);
+
+    try {
+      // 1. Immediately fetch the database document for this ID from Firestore
+      const cloudState = await getStateFromFirestore(newId);
+
+      if (cloudState && (
+        (cloudState.users && cloudState.users.length > 0) ||
+        (cloudState.pelanggan && cloudState.pelanggan.length > 0) ||
+        (cloudState.tagihan && cloudState.tagihan.length > 0)
+      )) {
+        // Yes, existing database found on Firestore! Load it instantly to state
+        setUsers(cloudState.users || []);
+        setAreas(cloudState.areas || []);
+        setPelanggan(cloudState.pelanggan || []);
+        setTagihan(cloudState.tagihan || []);
+        setCashFlow(cloudState.cashFlow || []);
+        setBudgets(cloudState.budgets || []);
+
+        // Also save to localStorage immediately to persist across browser refreshes
+        saveStoredData('users', cloudState.users || []);
+        saveStoredData('areas', cloudState.areas || []);
+        saveStoredData('pelanggan', cloudState.pelanggan || []);
+        saveStoredData('tagihan', cloudState.tagihan || []);
+        saveStoredData('cash_flow', cloudState.cashFlow || []);
+        saveStoredData('budgets', cloudState.budgets || []);
+
+        const cloudStateStr = canonicalStringify(cloudState);
+        lastRemoteStateRef.current = cloudStateStr;
+
+        const mockUser = {
+          uid: newId,
+          isAnonymous: true,
+          displayName: 'Loket Digital',
+          email: 'otomatis@loket.digital'
+        } as FirebaseUser;
+        setFirebaseUser(mockUser);
+        setHasLoadedFromCloud(true);
+
+        return {
+          exists: true,
+          userCount: cloudState.users?.length || 0,
+          pelangganCount: cloudState.pelanggan?.length || 0,
+          tagihanCount: cloudState.tagihan?.length || 0,
+          areaCount: cloudState.areas?.length || 0
+        };
+      } else {
+        // No existing database found or it is blank: initialize the Cloud DB with our current local state
+        const currentState = stateRef.current;
+        await saveStateToFirestore(newId, currentState);
+        
+        lastRemoteStateRef.current = canonicalStringify(currentState);
+
+        const mockUser = {
+          uid: newId,
+          isAnonymous: true,
+          displayName: 'Loket Digital',
+          email: 'otomatis@loket.digital'
+        } as FirebaseUser;
+        setFirebaseUser(mockUser);
+        setHasLoadedFromCloud(true);
+
+        return {
+          exists: false
+        };
+      }
+    } catch (e: any) {
+      console.error("Gagal mengganti ID Database:", e);
+      setSyncError("Gagal menyambungkan ke database ID baru.");
+      throw e;
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleGoogleSignIn = async () => {
@@ -234,22 +301,35 @@ export default function App() {
         budgets
       };
       
-      // 1. First save our local state to Cloud to make sure nothing is lost
-      await saveStateToFirestore(firebaseUser.uid, currentState);
-
-      // 2. Then get the latest state from Firestore to merge back
+      // 1. Get the latest state from Firestore first to merge safely, preventing overwriting with blank local data
       const cloudState = await getStateFromFirestore(firebaseUser.uid);
+      let finalState = currentState;
+
       if (cloudState) {
-        const mergedState = mergeStates(currentState, cloudState);
-        setUsers(mergedState.users || INITIAL_USERS);
-        setAreas(mergedState.areas || INITIAL_AREAS);
-        setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
-        setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
-        setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
-        setBudgets(mergedState.budgets || INITIAL_BUDGETS);
-        
-        lastRemoteStateRef.current = canonicalStringify(mergedState);
+        // Safe merge: Cloud items overwrite matching local items, and new cloud items are pulled
+        finalState = mergeStates(currentState, cloudState);
       }
+      
+      // 2. Save the final merged state back to Cloud
+      await saveStateToFirestore(firebaseUser.uid, finalState);
+
+      // 3. Update local states
+      setUsers(finalState.users || INITIAL_USERS);
+      setAreas(finalState.areas || INITIAL_AREAS);
+      setPelanggan(finalState.pelanggan || INITIAL_PELANGGAN);
+      setTagihan(finalState.tagihan || INITIAL_TAGIHAN);
+      setCashFlow(finalState.cashFlow || INITIAL_CASH_FLOW);
+      setBudgets(finalState.budgets || INITIAL_BUDGETS);
+      
+      // Update local storage too to ensure immediate local persistence
+      saveStoredData('users', finalState.users || INITIAL_USERS);
+      saveStoredData('areas', finalState.areas || INITIAL_AREAS);
+      saveStoredData('pelanggan', finalState.pelanggan || INITIAL_PELANGGAN);
+      saveStoredData('tagihan', finalState.tagihan || INITIAL_TAGIHAN);
+      saveStoredData('cash_flow', finalState.cashFlow || INITIAL_CASH_FLOW);
+      saveStoredData('budgets', finalState.budgets || INITIAL_BUDGETS);
+
+      lastRemoteStateRef.current = canonicalStringify(finalState);
       
       setSyncSuccess(true);
       setHasLoadedFromCloud(true);
