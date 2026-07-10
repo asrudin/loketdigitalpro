@@ -7,8 +7,11 @@ import {
   Edit, 
   X,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface PetugasManagerProps {
   users: User[];
@@ -52,26 +55,17 @@ export default function PetugasManager({
 
   // Import states
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importTab, setImportTab] = useState<'file' | 'paste'>('file');
   const [csvText, setCsvText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleImportCSVSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setImportError('');
-    setImportSuccess('');
-
-    if (!csvText.trim()) {
-      setImportError('Teks data kosong. Silakan tempel atau unggah file.');
-      return;
-    }
-
+  const parseAndImportPetugasCSVText = (text: string) => {
     try {
-      const lines = csvText.trim().split('\n');
+      const lines = text.trim().split('\n');
       if (lines.length < 2) {
-        setImportError('Format salah. Butuh setidaknya satu baris header dan satu baris data.');
-        return;
+        throw new Error('Format salah. Butuh setidaknya satu baris header dan satu baris data.');
       }
 
       const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
@@ -114,8 +108,7 @@ export default function PetugasManager({
       }
 
       if (parsedData.length === 0) {
-        setImportError('Tidak ada data petugas valid yang diimpor.');
-        return;
+        throw new Error('Tidak ada data petugas valid yang diimpor.');
       }
 
       onImportPetugas(parsedData);
@@ -128,6 +121,174 @@ export default function PetugasManager({
 
     } catch (err: any) {
       setImportError('Gagal memproses data: ' + err.message);
+    }
+  };
+
+  const handleImportCSVSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportError('');
+    setImportSuccess('');
+    if (!csvText.trim()) {
+      setImportError('Teks data kosong. Silakan tempel atau unggah file.');
+      return;
+    }
+    parseAndImportPetugasCSVText(csvText);
+  };
+
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError('');
+    setImportSuccess('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processExcelFile(file);
+  };
+
+  const processExcelFile = (file: File) => {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExt === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+          parseAndImportPetugasCSVText(text);
+        }
+      };
+      reader.onerror = () => {
+        setImportError('Gagal membaca file CSV.');
+      };
+      reader.readAsText(file, 'UTF-8');
+      return;
+    }
+
+    // Process binary Excel file (.xlsx, .xls)
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        // Convert to array of arrays
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        if (data.length < 2) {
+          setImportError('File kosong atau tidak memiliki baris data.');
+          return;
+        }
+
+        const headers = data[0].map((h: any) => String(h || '').toLowerCase().trim());
+        const parsedData: Omit<User, 'id'>[] = [];
+
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || cell === '')) {
+            continue;
+          }
+
+          const rowObj: any = {};
+          headers.forEach((h, index) => {
+            if (h) {
+              rowObj[h] = row[index] !== undefined && row[index] !== null ? String(row[index]).trim() : '';
+            }
+          });
+
+          const mappedUsername = rowObj['username'] || '';
+          const mappedName = rowObj['nama'] || rowObj['name'] || '';
+          const rawRole = (rowObj['peran'] || rowObj['role'] || 'kasir').toLowerCase();
+          const mappedRole: Role = rawRole === 'admin' ? 'admin' : 'kasir';
+          const mappedAreaCode = rowObj['kode_dusun'] || rowObj['area_code'] || '';
+
+          if (!mappedUsername || !mappedName) {
+            continue; // Skip invalid row
+          }
+
+          // Search areaId if code provided
+          let matchedAreaId: string | undefined = undefined;
+          if (mappedAreaCode) {
+            const matchedArea = areas.find(a => a.code.toLowerCase() === mappedAreaCode.toLowerCase() || a.name.toLowerCase().includes(mappedAreaCode.toLowerCase()));
+            if (matchedArea) {
+              matchedAreaId = matchedArea.id;
+            }
+          }
+
+          parsedData.push({
+            username: mappedUsername,
+            name: mappedName,
+            role: mappedRole,
+            areaId: matchedAreaId
+          });
+        }
+
+        if (parsedData.length === 0) {
+          setImportError('Tidak ada data petugas valid yang ditemukan di file Excel.');
+          return;
+        }
+
+        onImportPetugas(parsedData);
+        setImportSuccess(`Sukses! Berhasil mengimpor ${parsedData.length} data petugas baru.`);
+        setTimeout(() => {
+          setIsImportOpen(false);
+          setImportSuccess('');
+        }, 2000);
+
+      } catch (err: any) {
+        setImportError('Gagal memproses file Excel: ' + err.message);
+      }
+    };
+    reader.onerror = () => {
+      setImportError('Gagal membaca file.');
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const downloadPetugasExcelTemplate = () => {
+    const templateData = [
+      ['username', 'nama', 'peran', 'kode_dusun'],
+      ['kasir_budi', 'Budi Santoso', 'kasir', 'KJT'],
+      ['kasir_ani', 'Ani Wijaya', 'kasir', 'KRJ'],
+      ['admin_anto', 'Anto Wibowo', 'admin', '']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+
+    const wscols = [
+      { wch: 18 }, // username
+      { wch: 22 }, // nama
+      { wch: 12 }, // peran
+      { wch: 15 }  // kode_dusun
+    ];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Petugas');
+    XLSX.writeFile(wb, 'template_petugas.xlsx');
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    setImportError('');
+    setImportSuccess('');
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (fileExt === 'xlsx' || fileExt === 'xls' || fileExt === 'csv') {
+      processExcelFile(file);
+    } else {
+      setImportError('Format file tidak didukung. Harap unggah file .xlsx, .xls, atau .csv');
     }
   };
 
@@ -223,56 +384,131 @@ export default function PetugasManager({
       {/* Import Section */}
       {isImportOpen && (
         <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Upload className="h-4 w-4 text-emerald-400" />
-              Unggah / Tempel Data Petugas Baru
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-              Sempurnakan impor dengan CSV atau copy-paste dari Sheets. Format baris pertama wajib berupa header berikut:<br/>
-              <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">username, nama, peran, kode_dusun</span>
-            </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+                Impor Data Akun Petugas (Admin & Kasir)
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                Anda dapat mengimpor banyak akun petugas sekaligus menggunakan file Excel (.xlsx, .xls) atau CSV.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={downloadPetugasExcelTemplate}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-[11px] font-bold transition cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Unduh Template Excel
+            </button>
           </div>
 
-          <form onSubmit={handleImportCSVSubmit} className="space-y-3">
-            <textarea
-              id="csv-import-petugas"
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`username,nama,peran,kode_dusun\nkasir_budi,Budi Santoso,kasir,KJT\nkasir_ani,Ani Wijaya,kasir,KRJ`}
-              className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
-            />
+          {/* Tab Selector */}
+          <div className="flex border-b border-white/5 pb-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setImportTab('file')}
+              className={`pb-1.5 text-xs font-bold transition border-b-2 cursor-pointer ${
+                importTab === 'file'
+                  ? 'border-emerald-400 text-white'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              Unggah File Excel/CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportTab('paste')}
+              className={`pb-1.5 text-xs font-bold transition border-b-2 cursor-pointer ${
+                importTab === 'paste'
+                  ? 'border-emerald-400 text-white'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              Tempel Teks (Copy-Paste)
+            </button>
+          </div>
 
-            {importError && (
-              <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{importError}</span>
-              </div>
-            )}
-
-            {importSuccess && (
-              <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{importSuccess}</span>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsImportOpen(false)}
-                className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+          {importTab === 'file' ? (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center transition ${
+                isDragOver
+                  ? 'border-emerald-400 bg-emerald-400/5'
+                  : 'border-white/10 hover:border-white/20 bg-slate-950/20'
+              }`}
+            >
+              <input
+                id="file-import-petugas"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleExcelUpload}
+                className="hidden"
+              />
+              <label
+                htmlFor="file-import-petugas"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-2.5"
               >
-                Batal
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
-              >
-                Mulai Impor Petugas
-              </button>
+                <div className="p-3 bg-white/5 rounded-full border border-white/5">
+                  <Upload className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">Seret & taruh file Excel / CSV di sini</p>
+                  <p className="text-[10px] text-slate-400 mt-1">atau klik untuk menelusuri dari folder komputer</p>
+                </div>
+                <div className="text-[9px] text-slate-500 font-mono">
+                  Mendukung file format: .xlsx, .xls, .csv
+                </div>
+              </label>
             </div>
-          </form>
+          ) : (
+            <form onSubmit={handleImportCSVSubmit} className="space-y-3">
+              <p className="text-[11px] text-slate-400 leading-normal font-medium">
+                Gunakan header kolom berikut pada baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">username,nama,peran,kode_dusun</code>.
+              </p>
+
+              <textarea
+                id="csv-import-petugas"
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={`username,nama,peran,kode_dusun\nkasir_budi,Budi Santoso,kasir,KJT\nkasir_ani,Ani Wijaya,kasir,KRJ`}
+                className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCsvText('username,nama,peran,kode_dusun\nkasir_eko,Eko Prasetyo,kasir,KJT\nkasir_siti,Siti Rahayu,kasir,KRJ')}
+                  className="px-3 py-1.5 bg-white/5 border border-white/5 text-[10px] font-bold text-slate-300 hover:bg-white/10 rounded-lg cursor-pointer transition"
+                >
+                  Gunakan Contoh Template
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Mulai Impor Petugas
+                </button>
+              </div>
+            </form>
+          )}
+
+          {importError && (
+            <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{importError}</span>
+            </div>
+          )}
+
+          {importSuccess && (
+            <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{importSuccess}</span>
+            </div>
+          )}
         </div>
       )}
 
