@@ -101,6 +101,197 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Light Theme Styling Overrides */
+body.theme-light {
+  background: radial-gradient(circle at 50% 50%, #f8fafc 0%, #e2e8f0 100%) !important;
+  color: #0f172a !important;
+}
+
+.theme-light .glass-panel {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.theme-light .glass-panel-heavy {
+  background: rgba(248, 250, 252, 0.95) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+.theme-light .glass-card {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 8px 30px 0 rgba(15, 23, 42, 0.04) !important;
+}
+
+.theme-light .glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 12px 36px 0 rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light .glass-input {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  color: #0f172a !important;
+}
+
+.theme-light .glass-input:focus {
+  background: #ffffff !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.theme-light .text-white, 
+.theme-light h1, 
+.theme-light h2, 
+.theme-light h3, 
+.theme-light h4, 
+.theme-light h5, 
+.theme-light h6 {
+  color: #0f172a !important;
+}
+
+.theme-light .text-slate-100 {
+  color: #1e293b !important;
+}
+
+.theme-light .text-slate-200 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-300 {
+  color: #475569 !important;
+}
+
+.theme-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.theme-light .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+.theme-light .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+.theme-light .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.03) !important;
+}
+
+.theme-light .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light .bg-white\/20 {
+  background-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+.theme-light .bg-slate-900\/40 {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.theme-light .bg-slate-950\/60 {
+  background-color: rgba(248, 250, 252, 0.8) !important;
+}
+
+.theme-light .bg-slate-950\/80 {
+  background-color: rgba(241, 245, 249, 0.85) !important;
+}
+
+.theme-light .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+.theme-light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+.theme-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+.theme-light .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Accent Mapping Adjustments */
+.theme-light .text-emerald-300 {
+  color: #047857 !important;
+}
+
+.theme-light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+.theme-light .bg-emerald-500\/10 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+.theme-light .bg-emerald-500\/20 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+.theme-light .text-amber-400 {
+  color: #d97706 !important;
+}
+
+.theme-light .bg-amber-500\/10 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+
+.theme-light .bg-amber-500\/20 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+.theme-light .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+.theme-light .text-rose-300 {
+  color: #be123c !important;
+}
+
+.theme-light .bg-rose-500\/10 {
+  background-color: rgba(244, 63, 94, 0.1) !important;
+}
+
+.theme-light .bg-rose-500\/20 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+}
+
+.theme-light .bg-indigo-500\/10 {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+.theme-light .text-indigo-200 {
+  color: #3730a3 !important;
+}
+
+.theme-light .text-indigo-300 {
+  color: #4f46e5 !important;
+}
+
+/* Custom Scrollbar for Light Theme */
+.theme-light ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.02);
+}
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+}
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
+}
+
 /* Print CSS variables & layouts for invoices/receipts */
 @media print {
   body {

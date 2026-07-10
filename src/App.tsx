@@ -28,7 +28,7 @@ import KeuanganManager from './components/KeuanganManager';
 import PlanningKeuangan from './components/PlanningKeuangan';
 import BackupRestore from './components/BackupRestore';
 
-import { Shield, Lock, Cloud, CloudOff, RefreshCw, FolderSync } from 'lucide-react';
+import { Shield, Lock, Cloud, CloudOff, RefreshCw, FolderSync, Sun, Moon } from 'lucide-react';
 
 export default function App() {
   // 1. Core State
@@ -63,6 +63,19 @@ export default function App() {
   const [budgets, setBudgets] = useState<BudgetPlan[]>(() => {
     return loadStoredData<BudgetPlan[]>('budgets', INITIAL_BUDGETS);
   });
+
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return loadStoredData<'dark' | 'light'>('theme', 'dark');
+  });
+
+  useEffect(() => {
+    saveStoredData('theme', theme);
+    if (theme === 'light') {
+      document.body.classList.add('theme-light');
+    } else {
+      document.body.classList.remove('theme-light');
+    }
+  }, [theme]);
 
   // 1b. Firebase Cloud Sync State
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -979,6 +992,26 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Theme Toggle Switch */}
+            <button
+              id="btn-theme-toggle"
+              onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition duration-200 cursor-pointer"
+              title={theme === 'dark' ? 'Ubah ke Mode Terang' : 'Ubah ke Mode Gelap'}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Terang</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Gelap</span>
+                </>
+              )}
+            </button>
+
             {/* Cloud Sync Status Indicator */}
             <button 
               onClick={handleForceSync}

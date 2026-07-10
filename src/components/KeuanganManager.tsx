@@ -106,13 +106,46 @@ export default function KeuanganManager({
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
 
+  const downloadCSVEnergyTemplate = () => {
+    const csvContent = "\uFEFF" + "tanggal,tipe,kategori,nominal,keterangan\n" +
+      "2026-07-01,masuk,Pembayaran WiFi,150000,Pembayaran WiFi pelanggan Budi Setiawan\n" +
+      "2026-07-02,keluar,Operasional,350000,Pembelian ATK dan cetak kwitansi fisik\n" +
+      "2026-07-05,masuk,Iuran Air Bersih,45000,Iuran PDAM pelanggan Siti Aisyah\n" +
+      "2026-07-10,keluar,Pemeliharaan,750000,Perbaikan pipa pompa air utama dusun krajan";
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "template_arus_kas_loket.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvText(text);
+      setImportSuccess(`File "${file.name}" berhasil diunggah! Silakan klik tombol "Mulai Impor Kas" di bawah untuk memproses.`);
+    };
+    reader.onerror = () => {
+      setImportError("Gagal membaca file.");
+    };
+    reader.readAsText(file);
+  };
+
   const handleImportCSVSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setImportError('');
     setImportSuccess('');
 
     if (!csvText.trim()) {
-      setImportError('Teks data kosong. Silakan tempel atau unggah file.');
+      setImportError('Teks data kosong. Silakan tempel teks atau unggah file.');
       return;
     }
 
@@ -123,13 +156,22 @@ export default function KeuanganManager({
         return;
       }
 
-      const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+      // Auto-detect delimiter (comma or semicolon)
+      const firstLine = lines[0];
+      const delimiter = firstLine.includes(';') ? ';' : ',';
+      
+      const headers = firstLine.toLowerCase().split(delimiter).map(h => h.trim().replace(/"/g, '').replace(/^\uFEFF/, ''));
       const parsedData: Omit<CashFlow, 'id'>[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
 
-        const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+        // Regexp splitting based on detected delimiter, respecting quotes
+        const regex = delimiter === ';'
+          ? /;(?=(?:(?:[^"]*"){2})*[^"]*$)/
+          : /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+
+        const values = lines[i].split(regex).map(v => v.trim().replace(/^"|"$/g, ''));
         const rowObj: any = {};
         headers.forEach((h, index) => {
           rowObj[h] = values[index] || '';
@@ -142,7 +184,7 @@ export default function KeuanganManager({
         const mappedAmount = Number(rowObj['nominal'] || rowObj['amount'] || rowObj['jumlah'] || 0);
         const mappedDesc = rowObj['keterangan'] || rowObj['description'] || '';
 
-        if (mappedAmount <= 0) {
+        if (isNaN(mappedAmount) || mappedAmount <= 0) {
           throw new Error(`Jumlah nominal harus berupa angka positif pada baris ke-${i + 1}`);
         }
 
@@ -333,22 +375,62 @@ export default function KeuanganManager({
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Upload className="h-4 w-4 text-emerald-400" />
-              Unggah / Tempel Catatan Keuangan Arus Kas
+              Impor Massal Catatan Arus Kas Keuangan
             </h3>
             <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-              Dukung impor massal dari Excel atau Google Sheets. Kolom baris pertama wajib diletakkan di baris pertama:<br/>
-              <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">tanggal, tipe, kategori, nominal, keterangan</span>
+              Dukung impor data cepat secara massal menggunakan file Excel (.csv) atau copy-paste dari spreadsheet Anda.
             </p>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Interactive File Picker Card */}
+            <div className="border border-dashed border-white/10 hover:border-emerald-500/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-white/5 hover:bg-white/10 transition duration-200 relative cursor-pointer group">
+              <input
+                type="file"
+                id="csv-file-input"
+                accept=".csv,.txt"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+              />
+              <Upload className="h-7 w-7 text-emerald-400 mb-2 group-hover:scale-110 transition duration-200" />
+              <span className="text-xs font-bold text-slate-200 group-hover:text-white transition duration-200">
+                Pilih atau Seret File Excel (CSV)
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1">Mendukung file .csv atau .txt</span>
+            </div>
+
+            {/* Template Download Guide */}
+            <div className="glass-card p-4 rounded-2xl flex flex-col justify-between border border-white/5 bg-white/2">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Format Template Kas</span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Kolom wajib baris pertama: <code className="text-[10px] font-mono bg-white/10 px-1 py-0.5 rounded text-white">tanggal, tipe, kategori, nominal, keterangan</code>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={downloadCSVEnergyTemplate}
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold transition duration-200 cursor-pointer"
+              >
+                <Download className="h-4 w-4" />
+                Unduh Template Excel (CSV)
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleImportCSVSubmit} className="space-y-3">
-            <textarea
-              id="csv-import-kas"
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`tanggal,tipe,kategori,nominal,keterangan\n2026-06-01,masuk,Pembayaran WiFi,150000,Pembayaran WiFi Wifi_01 pelanggan A\n2026-06-02,keluar,Operasional,350000,Sewa server cloud loket digital`}
-              className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
-            />
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                Atau Tempel / Sunting Teks CSV
+              </label>
+              <textarea
+                id="csv-import-kas"
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={`tanggal,tipe,kategori,nominal,keterangan\n2026-07-01,masuk,Pembayaran WiFi,150000,Pembayaran WiFi pelanggan Budi Setiawan\n2026-07-02,keluar,Operasional,350000,Sewa server cloud loket digital`}
+                className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
+              />
+            </div>
 
             {importError && (
               <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
@@ -364,17 +446,22 @@ export default function KeuanganManager({
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setIsImportOpen(false)}
-                className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                onClick={() => {
+                  setIsImportOpen(false);
+                  setCsvText('');
+                  setImportError('');
+                  setImportSuccess('');
+                }}
+                className="px-4 py-2 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+                className="px-5 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition cursor-pointer shadow-md shadow-emerald-500/15"
               >
                 Mulai Impor Kas
               </button>
