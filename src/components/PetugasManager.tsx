@@ -18,6 +18,7 @@ interface PetugasManagerProps {
   areas: Area[];
   onAddArea: (a: Omit<Area, 'id'>) => void;
   onUpdateArea: (a: Area) => void;
+  onImportArea: (data: Omit<Area, 'id'>[]) => void;
   onDeleteArea: (id: string) => void;
   onAssignUserArea: (userId: string, areaId: string | undefined) => void;
   onImportPetugas: (data: Omit<User, 'id'>[]) => void;
@@ -31,6 +32,7 @@ export default function PetugasManager({
   areas,
   onAddArea,
   onUpdateArea,
+  onImportArea,
   onDeleteArea,
   onAssignUserArea,
   onImportPetugas,
@@ -43,6 +45,14 @@ export default function PetugasManager({
   const [areaName, setAreaName] = useState('');
   const [areaCode, setAreaCode] = useState('');
   const [editingArea, setEditingArea] = useState<Area | null>(null);
+
+  // Area Import states
+  const [isAreaImportOpen, setIsAreaImportOpen] = useState(false);
+  const [areaImportTab, setAreaImportTab] = useState<'file' | 'paste'>('file');
+  const [areaCsvText, setAreaCsvText] = useState('');
+  const [areaImportError, setAreaImportError] = useState('');
+  const [areaImportSuccess, setAreaImportSuccess] = useState('');
+  const [isAreaDragOver, setIsAreaDragOver] = useState(false);
 
   // User form states
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -289,6 +299,238 @@ export default function PetugasManager({
       processExcelFile(file);
     } else {
       setImportError('Format file tidak didukung. Harap unggah file .xlsx, .xls, atau .csv');
+    }
+  };
+
+  const parseAndImportAreaCSVText = (text: string) => {
+    try {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) {
+        throw new Error('Format salah. Butuh setidaknya satu baris header dan satu baris data.');
+      }
+
+      const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+      const nameIndex = headers.indexOf('nama_area');
+      const codeIndex = headers.indexOf('kode_singkat');
+
+      if (nameIndex === -1 || codeIndex === -1) {
+        throw new Error('Header kolom wajib ada: nama_area, kode_singkat');
+      }
+
+      const parsedData: Omit<Area, 'id'>[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cells = line.split(',').map(c => c.trim().replace(/"/g, ''));
+        const name = cells[nameIndex] || '';
+        const code = (cells[codeIndex] || '').toUpperCase();
+
+        if (!name || !code) {
+          continue; // skip invalid row
+        }
+
+        parsedData.push({
+          name,
+          code
+        });
+      }
+
+      if (parsedData.length === 0) {
+        throw new Error('Tidak ada data area valid yang diimpor.');
+      }
+
+      onImportArea(parsedData);
+      setAreaImportSuccess(`Sukses! Berhasil mengimpor ${parsedData.length} data wilayah area baru.`);
+      setTimeout(() => {
+        setIsAreaImportOpen(false);
+        setAreaImportSuccess('');
+        setAreaCsvText('');
+      }, 2000);
+
+    } catch (err: any) {
+      setAreaImportError(err.message);
+    }
+  };
+
+  const handleAreaCSVSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAreaImportError('');
+    setAreaImportSuccess('');
+    if (!areaCsvText.trim()) {
+      setAreaImportError('Teks data kosong. Silakan tempel atau unggah file.');
+      return;
+    }
+    parseAndImportAreaCSVText(areaCsvText);
+  };
+
+  const handleAreaExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAreaImportError('');
+    setAreaImportSuccess('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processAreaExcelFile(file);
+  };
+
+  const processAreaExcelFile = (file: File) => {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExt === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+          parseAndImportAreaCSVText(text);
+        }
+      };
+      reader.onerror = () => {
+        setAreaImportError('Gagal membaca file CSV.');
+      };
+      reader.readAsText(file, 'UTF-8');
+      return;
+    }
+
+    // Process binary Excel file (.xlsx, .xls)
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        // Convert to array of arrays
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        if (data.length < 2) {
+          setAreaImportError('File kosong atau tidak memiliki baris data.');
+          return;
+        }
+
+        const headers = data[0].map((h: any) => String(h || '').toLowerCase().trim());
+        
+        // Find mapped indexes
+        const nameIndex = headers.findIndex(h => h.includes('nama') || h.includes('area') || h.includes('dusun'));
+        const codeIndex = headers.findIndex(h => h.includes('kode') || h.includes('code') || h.includes('singkat'));
+
+        if (nameIndex === -1 || codeIndex === -1) {
+          setAreaImportError('Format file Excel salah. Kolom harus berisi "nama_area" dan "kode_singkat" (E.g. KJT, KRJ, dll).');
+          return;
+        }
+
+        const parsedData: Omit<Area, 'id'>[] = [];
+
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || cell === '')) {
+            continue;
+          }
+
+          const name = row[nameIndex] !== undefined && row[nameIndex] !== null ? String(row[nameIndex]).trim() : '';
+          const code = row[codeIndex] !== undefined && row[codeIndex] !== null ? String(row[codeIndex]).trim().toUpperCase() : '';
+
+          if (!name || !code) {
+            continue; // Skip invalid row
+          }
+
+          parsedData.push({
+            name,
+            code
+          });
+        }
+
+        if (parsedData.length === 0) {
+          setAreaImportError('Tidak ada data area valid yang ditemukan di file Excel.');
+          return;
+        }
+
+        onImportArea(parsedData);
+        setAreaImportSuccess(`Sukses! Berhasil mengimpor ${parsedData.length} data wilayah area baru.`);
+        setTimeout(() => {
+          setIsAreaImportOpen(false);
+          setAreaImportSuccess('');
+        }, 2000);
+
+      } catch (err: any) {
+        setAreaImportError('Gagal memproses file Excel: ' + err.message);
+      }
+    };
+    reader.onerror = () => {
+      setAreaImportError('Gagal membaca file.');
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const downloadAreaExcelTemplate = () => {
+    const templateData = [
+      ['nama_area', 'kode_singkat'],
+      ['Dusun Krajan Tengah', 'KJT'],
+      ['Dusun Krajan', 'KRJ'],
+      ['Dusun Karanganyar', 'KRG'],
+      ['Dusun Mulyorejo', 'MLY']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+
+    const wscols = [
+      { wch: 25 }, // nama_area
+      { wch: 15 }  // kode_singkat
+    ];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Area');
+    XLSX.writeFile(wb, 'template_area.xlsx');
+  };
+
+  const exportAreasToExcel = () => {
+    if (areas.length === 0) {
+      alert('Tidak ada data wilayah area untuk diekspor.');
+      return;
+    }
+
+    const exportData = [
+      ['nama_area', 'kode_singkat'],
+      ...areas.map(a => [a.name, a.code])
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+    const wscols = [
+      { wch: 25 }, // nama_area
+      { wch: 15 }  // kode_singkat
+    ];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Daftar Wilayah Area');
+    XLSX.writeFile(wb, 'daftar_wilayah_area.xlsx');
+  };
+
+  const handleAreaDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsAreaDragOver(true);
+  };
+
+  const handleAreaDragLeave = () => {
+    setIsAreaDragOver(false);
+  };
+
+  const handleAreaDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsAreaDragOver(false);
+    setAreaImportError('');
+    setAreaImportSuccess('');
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (fileExt === 'xlsx' || fileExt === 'xls' || fileExt === 'csv') {
+      processAreaExcelFile(file);
+    } else {
+      setAreaImportError('Format file tidak didukung. Harap unggah file .xlsx, .xls, atau .csv');
     }
   };
 
@@ -613,25 +855,171 @@ export default function PetugasManager({
 
         {/* Right Column: Manage Village Areas */}
         <div className="glass-card p-5 rounded-2xl space-y-4">
-          <div className="flex justify-between items-center pb-2 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-2 border-b border-white/5 gap-3">
             <div>
               <h2 className="text-xs font-bold text-white uppercase tracking-wider">Daftar Wilayah (Dusun / RT / RW)</h2>
               <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Daftar cakupan administratif desa untuk pengelompokan pelanggan</p>
             </div>
-            <button
-              id="btn-add-area"
-              onClick={() => {
-                setEditingArea(null);
-                setAreaName('');
-                setAreaCode('');
-                setIsAreaModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition duration-150 cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Tambah Area
-            </button>
+            <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsAreaImportOpen(!isAreaImportOpen)}
+                className="flex items-center gap-1 px-2.5 py-1.5 border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg text-[11px] font-bold transition duration-150 cursor-pointer"
+                title="Impor Area dari Excel atau CSV"
+              >
+                <Upload className="h-3 w-3 text-emerald-400" />
+                Impor
+              </button>
+              <button
+                type="button"
+                onClick={exportAreasToExcel}
+                className="flex items-center gap-1 px-2.5 py-1.5 border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg text-[11px] font-bold transition duration-150 cursor-pointer"
+                title="Ekspor seluruh daftar area ke Excel"
+              >
+                <Download className="h-3 w-3 text-emerald-400" />
+                Ekspor
+              </button>
+              <button
+                id="btn-add-area"
+                onClick={() => {
+                  setEditingArea(null);
+                  setAreaName('');
+                  setAreaCode('');
+                  setIsAreaModalOpen(true);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-[11px] font-bold transition duration-150 cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+                Tambah Area
+              </button>
+            </div>
           </div>
+
+          {/* Area Import panel */}
+          {isAreaImportOpen && (
+            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-3.5">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <h3 className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-1">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />
+                    Impor Wilayah Area
+                  </h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Unggah file Excel (.xlsx, .xls) atau CSV untuk wilayah area.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadAreaExcelTemplate}
+                  className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                >
+                  <Download className="h-3 w-3" />
+                  Template Excel
+                </button>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex border-b border-white/5 pb-1 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAreaImportTab('file')}
+                  className={`pb-1 text-[11px] font-bold transition border-b-2 cursor-pointer ${
+                    areaImportTab === 'file'
+                      ? 'border-emerald-400 text-white'
+                      : 'border-transparent text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Unggah File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAreaImportTab('paste')}
+                  className={`pb-1 text-[11px] font-bold transition border-b-2 cursor-pointer ${
+                    areaImportTab === 'paste'
+                      ? 'border-emerald-400 text-white'
+                      : 'border-transparent text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Tempel Teks
+                </button>
+              </div>
+
+              {areaImportTab === 'file' ? (
+                <div
+                  onDragOver={handleAreaDragOver}
+                  onDragLeave={handleAreaDragLeave}
+                  onDrop={handleAreaDrop}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center transition ${
+                    isAreaDragOver
+                      ? 'border-emerald-400 bg-emerald-400/5'
+                      : 'border-white/10 hover:border-white/20 bg-slate-950/20'
+                  }`}
+                >
+                  <input
+                    id="file-import-area"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleAreaExcelUpload}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-import-area"
+                    className="cursor-pointer flex flex-col items-center justify-center space-y-1.5"
+                  >
+                    <Upload className="h-4 w-4 text-emerald-400" />
+                    <div>
+                      <p className="text-[11px] font-bold text-white">Seret & taruh file Excel / CSV di sini</p>
+                      <p className="text-[10px] text-slate-400">atau klik untuk menelusuri</p>
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <form onSubmit={handleAreaCSVSubmit} className="space-y-2">
+                  <p className="text-[10px] text-slate-400 leading-normal font-medium">
+                    Header wajib baris pertama: <code className="bg-white/10 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">nama_area,kode_singkat</code>.
+                  </p>
+
+                  <textarea
+                    id="csv-import-area"
+                    value={areaCsvText}
+                    onChange={(e) => setAreaCsvText(e.target.value)}
+                    placeholder={`nama_area,kode_singkat\nDusun Krajan,KRJ\nDusun Mulyorejo,MLY`}
+                    className="w-full h-20 text-[11px] font-mono bg-slate-950/60 border border-white/10 rounded-xl p-2.5 focus:outline-none focus:border-emerald-500/40 text-slate-300"
+                  />
+
+                  <div className="flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setAreaCsvText('nama_area,kode_singkat\nDusun Krajan,KRJ\nDusun Mulyorejo,MLY\nDusun Karanganyar,KRG')}
+                      className="px-2 py-1 bg-white/5 border border-white/5 text-[9px] font-bold text-slate-300 hover:bg-white/10 rounded transition cursor-pointer"
+                    >
+                      Contoh Template
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-[10px] font-bold transition cursor-pointer"
+                    >
+                      Mulai Impor Area
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {areaImportError && (
+                <div className="flex items-start gap-1.5 text-rose-400 text-[10px] bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{areaImportError}</span>
+                </div>
+              )}
+
+              {areaImportSuccess && (
+                <div className="flex items-start gap-1.5 text-emerald-400 text-[10px] bg-emerald-500/10 p-2 rounded border border-emerald-500/20">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{areaImportSuccess}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="divide-y divide-white/5 text-xs">
             {areas.map((area) => {

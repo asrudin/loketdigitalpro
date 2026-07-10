@@ -558,6 +558,27 @@ export default function App() {
     setAreas(prev => prev.map(x => x.id === a.id ? a : x));
   };
 
+  const handleImportArea = (importedAreas: Omit<Area, 'id'>[]) => {
+    setAreas(prev => {
+      const newList = [...prev];
+      const batchTimestamp = Date.now();
+      importedAreas.forEach((item, index) => {
+        // Prevent duplicate area codes or names
+        const exists = newList.some(
+          a => a.code.toUpperCase() === item.code.toUpperCase() || 
+               a.name.toLowerCase() === item.name.toLowerCase()
+        );
+        if (!exists) {
+          newList.push({
+            ...item,
+            id: 'area-imp-' + batchTimestamp + '-' + index + '-' + Math.floor(Math.random() * 1000)
+          });
+        }
+      });
+      return newList;
+    });
+  };
+
   const handleDeleteArea = (id: string) => {
     setAreas(prev => prev.filter(x => x.id !== id));
     // Reset staff working in this area
@@ -1030,6 +1051,7 @@ export default function App() {
               areas={areas}
               onAddArea={handleAddArea}
               onUpdateArea={handleUpdateArea}
+              onImportArea={handleImportArea}
               onDeleteArea={handleDeleteArea}
               onAssignUserArea={handleAssignUserArea}
               onImportPetugas={handleImportPetugas}
