@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { read, utils } from 'xlsx';
 import { Tagihan, Pelanggan, Area, User, BillType } from '../types';
 import { 
   Search, 
@@ -105,9 +106,92 @@ export default function TagihanManager({
 
   // Import states
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'file' | 'text'>('file');
+  const [isDragging, setIsDragging] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+
+  const resolveExcelDate = (val: any) => {
+    if (typeof val === 'number') {
+      const date = new Date((val - 25569) * 86400 * 1000);
+      return date.toISOString();
+    }
+    return String(val || new Date().toISOString());
+  };
+
+  const handleFileUpload = (file: File) => {
+    setImportError('');
+    setImportSuccess('');
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+        if (jsonData.length === 0) {
+          throw new Error('File kosong atau tidak memiliki data.');
+        }
+
+        const parsedData: any[] = [];
+        
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          const normalizedRow: any = {};
+          Object.keys(row).forEach(key => {
+            normalizedRow[key.toLowerCase().trim().replace(/"/g, '')] = row[key];
+          });
+
+          const mappedPelanggan = normalizedRow['id_pelanggan'] || normalizedRow['pelanggan'] || normalizedRow['nama_pelanggan'] || '';
+          
+          const rawType = String(normalizedRow['jenis_tagihan'] || normalizedRow['jenis_layanan'] || normalizedRow['type'] || 'wifi').toLowerCase();
+          const mappedType = rawType.includes('wifi') ? 'wifi' : rawType.includes('pln') ? 'pln' : 'pdam';
+
+          const mappedMonth = String(normalizedRow['periode_bulan'] || normalizedRow['periode'] || normalizedRow['month'] || '2026-07');
+
+          const mappedAmount = Number(normalizedRow['jumlah_bayar'] || normalizedRow['jumlah'] || normalizedRow['amount'] || 0);
+
+          const mappedRef = String(normalizedRow['no_referensi'] || normalizedRow['id_transaksi'] || normalizedRow['reference_no'] || '');
+          
+          const rawPaidAt = normalizedRow['tanggal_bayar'] || normalizedRow['paid_at'] || '';
+          const mappedPaidAt = rawPaidAt ? resolveExcelDate(rawPaidAt) : new Date().toISOString();
+          
+          const mappedOfficer = normalizedRow['petugas_kasir'] || normalizedRow['kasir_username'] || '';
+
+          if (!mappedPelanggan) {
+            throw new Error(`Data Pelanggan (ID atau Nama) wajib diisi pada baris ke-${i + 2}`);
+          }
+          if (mappedAmount <= 0) {
+            throw new Error(`Jumlah bayar harus berupa angka positif pada baris ke-${i + 2}`);
+          }
+
+          parsedData.push({
+            pelangganCodeOrName: String(mappedPelanggan),
+            type: mappedType,
+            month: mappedMonth,
+            amount: mappedAmount,
+            paidAt: mappedPaidAt,
+            referenceNo: mappedRef,
+            officerUsername: String(mappedOfficer)
+          });
+        }
+
+        onImportPembayaran(parsedData);
+        setImportSuccess(`Sukses! Berhasil mengimpor ${parsedData.length} transaksi pembayaran dari file "${file.name}"`);
+        setTimeout(() => {
+          setIsImportOpen(false);
+          setImportSuccess('');
+        }, 2000);
+      } catch (err: any) {
+        setImportError('Gagal memproses file Excel/CSV: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   // Sync state for "petugas area desa sesuaikan kasir pembayaran"
   useState(() => {
@@ -346,56 +430,152 @@ export default function TagihanManager({
       {/* Import Panel */}
       {isImportOpen && (
         <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Upload className="h-4 w-4 text-emerald-400" />
-              Unggah / Tempel Data Pembayaran Berhasil
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-              Dukung copy-paste dari Sheets atau unggah CSV. Header yang direkomendasikan wajib diletakkan di baris pertama:<br/>
-              <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">id_pelanggan, jenis_tagihan, periode_bulan, jumlah_bayar, no_referensi, tanggal_bayar, petugas_kasir</span>
-            </p>
-          </div>
-
-          <form onSubmit={handleImportCSVSubmit} className="space-y-3">
-            <textarea
-              id="csv-import-pembayaran"
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={`id_pelanggan,jenis_tagihan,periode_bulan,jumlah_bayar,no_referensi,tanggal_bayar,petugas_kasir\nPLG-KJT-001,wifi,2026-06,150000,REF-883719,2026-06-15T08:30:00Z,kasir_budi\nPLG-KRJ-002,pln,2026-06,45000,REF-192837,2026-06-16T11:15:00Z,kasir_ani`}
-              className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
-            />
-
-            {importError && (
-              <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{importError}</span>
-              </div>
-            )}
-
-            {importSuccess && (
-              <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{importSuccess}</span>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Upload className="h-4 w-4 text-emerald-400" />
+                Impor Data Pembayaran Berhasil
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                Format kolom yang direkomendasikan wajib berada di baris pertama:<br/>
+                <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">id_pelanggan, jenis_tagihan, periode_bulan, jumlah_bayar, no_referensi, tanggal_bayar, petugas_kasir</span>
+              </p>
+            </div>
+            
+            {/* Tab switch */}
+            <div className="flex bg-slate-950 p-1 rounded-lg border border-white/5 self-start sm:self-auto">
               <button
                 type="button"
-                onClick={() => setIsImportOpen(false)}
-                className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                onClick={() => {
+                  setImportMode('file');
+                  setImportError('');
+                  setImportSuccess('');
+                }}
+                className={`px-3 py-1 rounded-md text-[11px] font-bold transition ${importMode === 'file' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400 hover:text-white'}`}
               >
-                Batal
+                File Excel / CSV
               </button>
               <button
-                type="submit"
-                className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setImportMode('text');
+                  setImportError('');
+                  setImportSuccess('');
+                }}
+                className={`px-3 py-1 rounded-md text-[11px] font-bold transition ${importMode === 'text' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400 hover:text-white'}`}
               >
-                Mulai Impor Transaksi
+                Tempel CSV
               </button>
             </div>
-          </form>
+          </div>
+
+          {importMode === 'file' ? (
+            /* DRAG & DROP / SELECT EXCEL FILE UI */
+            <div className="space-y-3">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleFileUpload(file);
+                }}
+                onClick={() => document.getElementById('excel-file-selector')?.click()}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2.5 ${
+                  isDragging 
+                    ? 'border-emerald-400 bg-emerald-500/10' 
+                    : 'border-white/10 hover:border-emerald-500/30 hover:bg-white/5'
+                }`}
+              >
+                <input
+                  type="file"
+                  id="excel-file-selector"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                  className="hidden"
+                />
+                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">Tarik & Lepas File Anda di sini atau <span className="text-emerald-400 underline">Pilih File</span></p>
+                  <p className="text-[10px] text-slate-400 mt-1">Mendukung format file Excel (.xlsx, .xls) atau CSV (.csv)</p>
+                </div>
+              </div>
+
+              {importError && (
+                <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {importSuccess && (
+                <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{importSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(false)}
+                  className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* TEXT AREA CSV IMPORT UI */
+            <form onSubmit={handleImportCSVSubmit} className="space-y-3">
+              <textarea
+                id="csv-import-pembayaran"
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={`id_pelanggan,jenis_tagihan,periode_bulan,jumlah_bayar,no_referensi,tanggal_bayar,petugas_kasir\nPLG-KJT-001,wifi,2026-06,150000,REF-883719,2026-06-15T08:30:00Z,kasir_budi\nPLG-KRJ-002,pln,2026-06,45000,REF-192837,2026-06-16T11:15:00Z,kasir_ani`}
+                className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
+              />
+
+              {importError && (
+                <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {importSuccess && (
+                <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{importSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(false)}
+                  className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Mulai Impor Transaksi
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 
