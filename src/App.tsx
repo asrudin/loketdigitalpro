@@ -987,7 +987,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Lokasi Loket:</span>
             <span className="text-xs font-bold text-slate-100 bg-white/10 border border-white/10 px-2.5 py-1 rounded-full">
-              Kantor Balai Desa Gemblengan
+              Gemblengan
             </span>
           </div>
 

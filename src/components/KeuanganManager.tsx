@@ -916,8 +916,8 @@ export default function KeuanganManager({
                   {/* Kop Surat Desa */}
                   <div className="text-center border-b-[3px] border-double border-black pb-4 mb-5">
                     <h4 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">PENGELOLA LAYANAN AIR BERSIH</h4>
-                    <h5 className="text-sm font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • KEMBLENGAN</h5>
-                    <p className="text-[9px] text-gray-700 italic mt-0.5">Kemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
+                    <h5 className="text-sm font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • GEMBLENGAN</h5>
+                    <p className="text-[9px] text-gray-700 italic mt-0.5">Gemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
                   </div>
 
                   {/* Judul Laporan */}
@@ -1032,17 +1032,17 @@ export default function KeuanganManager({
                         Owner
                       </p>
                       <p className="font-bold text-black underline uppercase">{villageHeadName || 'H. Ahmad Fauzi'}</p>
-                      <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Gemblengan</p>
                     </div>
 
                     <div>
                       <p className="font-bold mb-12 text-gray-900">
-                        Kemblengan, {formatIndonesianDate(printDate)}<br/>
+                        Gemblengan, {formatIndonesianDate(printDate)}<br/>
                         Dibuat Oleh,<br/>
                         Bendahara
                       </p>
                       <p className="font-bold text-black underline uppercase">{treasurerName || 'Siti Rahma, S.E.'}</p>
-                      <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Gemblengan</p>
                     </div>
                   </div>
                 </div>
@@ -1060,8 +1060,8 @@ export default function KeuanganManager({
         {/* Kop Surat Desa */}
         <div className="text-center border-b-[4px] border-double border-black pb-4 mb-6">
           <h1 className="text-lg font-extrabold tracking-wide uppercase text-black leading-tight">PENGELOLA LAYANAN AIR BERSIH</h1>
-          <h2 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • KEMBLENGAN</h2>
-          <p className="text-[10px] text-gray-800 italic mt-0.5">Kemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
+          <h2 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • GEMBLENGAN</h2>
+          <p className="text-[10px] text-gray-800 italic mt-0.5">Gemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
         </div>
 
         {/* Judul Laporan */}
@@ -1176,17 +1176,17 @@ export default function KeuanganManager({
               Owner
             </p>
             <p className="font-bold text-black underline uppercase">{villageHeadName}</p>
-            <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Gemblengan</p>
           </div>
 
           <div>
             <p className="font-bold mb-14 text-gray-900">
-              Kemblengan, {formatIndonesianDate(printDate)}<br/>
+              Gemblengan, {formatIndonesianDate(printDate)}<br/>
               Dibuat Oleh,<br/>
               Bendahara
             </p>
             <p className="font-bold text-black underline uppercase">{treasurerName}</p>
-            <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Gemblengan</p>
           </div>
         </div>
       </div>
