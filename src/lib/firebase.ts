@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support both local development config and environment variables for GitHub/Vercel/production support
@@ -14,7 +14,18 @@ const resolvedConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig?.appId,
 };
 
-const customDbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId;
+let customDbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (firebaseConfig as any)?.firestoreDatabaseId;
+
+// Sanitize customDbId: it must not contain slashes, colons, or look like a URL (which happens when databaseURL and firestoreDatabaseId are mixed up)
+if (customDbId && (customDbId.includes('/') || customDbId.includes(':') || customDbId.includes('.app') || customDbId.includes('http'))) {
+  console.warn("Invalid Firestore database ID detected, falling back to config database ID:", customDbId);
+  customDbId = (firebaseConfig as any)?.firestoreDatabaseId;
+}
+
+if (customDbId && (customDbId.includes('/') || customDbId.includes(':') || customDbId.includes('.app') || customDbId.includes('http'))) {
+  console.warn("Config database ID is also invalid, clearing database ID:", customDbId);
+  customDbId = undefined;
+}
 
 // Initialize Firebase
 const app = initializeApp(resolvedConfig);
@@ -24,6 +35,9 @@ let firestoreInstance: any;
 try {
   const settings = {
     experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
   };
   if (customDbId) {
     firestoreInstance = initializeFirestore(app, settings, customDbId);
@@ -33,7 +47,12 @@ try {
 } catch (e) {
   console.error("Failed to initialize custom Firestore database, falling back to default:", e);
   try {
-    firestoreInstance = initializeFirestore(app, { experimentalForceLongPolling: true });
+    firestoreInstance = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
   } catch (err2) {
     console.error("Failed to initialize default Firestore:", err2);
   }

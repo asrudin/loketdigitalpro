@@ -11,7 +11,9 @@ import {
   Calendar,
   X,
   Edit,
-  Trash2
+  Trash2,
+  Upload,
+  AlertCircle
 } from 'lucide-react';
 
 interface TagihanManagerProps {
@@ -24,6 +26,15 @@ interface TagihanManagerProps {
   onUpdateTagihan: (t: Tagihan) => void;
   onDeleteTagihan: (id: string) => void;
   onPayTagihanDirectly: (tagihanId: string) => void;
+  onImportPembayaran: (imported: {
+    pelangganCodeOrName: string;
+    type: BillType;
+    month: string;
+    amount: number;
+    paidAt: string;
+    referenceNo: string;
+    officerUsername?: string;
+  }[]) => void;
 }
 
 export default function TagihanManager({
@@ -35,7 +46,8 @@ export default function TagihanManager({
   onAddTagihan,
   onUpdateTagihan,
   onDeleteTagihan,
-  onPayTagihanDirectly
+  onPayTagihanDirectly,
+  onImportPembayaran
 }: TagihanManagerProps) {
   // Local states
   const [search, setSearch] = useState('');
@@ -51,6 +63,12 @@ export default function TagihanManager({
   const [billAmount, setBillAmount] = useState('150000');
   const [billMonth, setBillMonth] = useState('2026-07');
   const [dueDate, setDueDate] = useState('2026-07-20');
+
+  // Import states
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState('');
 
   // Sync state for "petugas area desa sesuaikan kasir pembayaran"
   useState(() => {
@@ -85,6 +103,89 @@ export default function TagihanManager({
     setIsModalOpen(false);
     setTargetPelangganId('');
     setEditingTagihan(null);
+  };
+
+  const handleImportCSVSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportError('');
+    setImportSuccess('');
+
+    if (!csvText.trim()) {
+      setImportError('Teks data kosong. Silakan tempel atau unggah file.');
+      return;
+    }
+
+    try {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) {
+        setImportError('Format salah. Butuh setidaknya satu baris header dan satu baris data.');
+        return;
+      }
+
+      const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+      const parsedData: any[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+
+        const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+        const rowObj: any = {};
+        headers.forEach((h, index) => {
+          rowObj[h] = values[index] || '';
+        });
+
+        // Resolve customer identification (code or name)
+        const mappedPelanggan = rowObj['id_pelanggan'] || rowObj['pelanggan'] || rowObj['nama_pelanggan'] || '';
+        
+        // Resolve bill type
+        const rawType = (rowObj['jenis_tagihan'] || rowObj['jenis_layanan'] || rowObj['type'] || 'wifi').toLowerCase();
+        const mappedType = rawType.includes('wifi') ? 'wifi' : rawType.includes('pln') ? 'pln' : 'pdam';
+
+        // Resolve billing month / period
+        const mappedMonth = rowObj['periode_bulan'] || rowObj['periode'] || rowObj['month'] || '2026-07';
+
+        // Resolve amount paid
+        const mappedAmount = Number(rowObj['jumlah_bayar'] || rowObj['jumlah'] || rowObj['amount'] || 0);
+
+        // Resolve transaction references & metadata
+        const mappedRef = rowObj['no_referensi'] || rowObj['id_transaksi'] || rowObj['reference_no'] || '';
+        const mappedPaidAt = rowObj['tanggal_bayar'] || rowObj['paid_at'] || new Date().toISOString();
+        const mappedOfficer = rowObj['petugas_kasir'] || rowObj['kasir_username'] || '';
+
+        if (!mappedPelanggan) {
+          throw new Error(`Data Pelanggan (ID atau Nama) wajib diisi pada baris ke-${i + 1}`);
+        }
+        if (mappedAmount <= 0) {
+          throw new Error(`Jumlah bayar harus berupa angka positif pada baris ke-${i + 1}`);
+        }
+
+        parsedData.push({
+          pelangganCodeOrName: mappedPelanggan,
+          type: mappedType,
+          month: mappedMonth,
+          amount: mappedAmount,
+          paidAt: mappedPaidAt,
+          referenceNo: mappedRef,
+          officerUsername: mappedOfficer
+        });
+      }
+
+      if (parsedData.length === 0) {
+        setImportError('Tidak ada data pembayaran valid yang diimpor.');
+        return;
+      }
+
+      onImportPembayaran(parsedData);
+      setImportSuccess(`Sukses! Berhasil memproses ${parsedData.length} transaksi pembayaran selesai ke dalam sistem.`);
+      setCsvText('');
+      setTimeout(() => {
+        setIsImportOpen(false);
+        setImportSuccess('');
+      }, 2000);
+
+    } catch (err: any) {
+      setImportError('Gagal memproses data: ' + err.message);
+    }
   };
 
   const getBillIcon = (type: BillType) => {
@@ -138,25 +239,92 @@ export default function TagihanManager({
           <p className="text-xs text-slate-400 mt-0.5 font-medium">Pantau daftar piutang pelanggan, disinkronkan berdasarkan wilayah dusun dan petugas penagih</p>
         </div>
         
-        {currentUser.role === 'admin' && (
+        <div className="flex items-center gap-2">
           <button
-            id="btn-open-add-bill"
-            onClick={() => {
-              setEditingTagihan(null);
-              setTargetPelangganId(pelanggan[0]?.id || '');
-              setBillType('wifi');
-              setBillAmount('150000');
-              setBillMonth('2026-07');
-              setDueDate('2026-07-20');
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
+            id="btn-import-pembayaran-toggle-unpaid"
+            onClick={() => setIsImportOpen(!isImportOpen)}
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Buat Tagihan Manual
+            <Upload className="h-3.5 w-3.5 text-emerald-400" />
+            Impor Pembayaran
           </button>
-        )}
+
+          {currentUser.role === 'admin' && (
+            <button
+              id="btn-open-add-bill"
+              onClick={() => {
+                setEditingTagihan(null);
+                setTargetPelangganId(pelanggan[0]?.id || '');
+                setBillType('wifi');
+                setBillAmount('150000');
+                setBillMonth('2026-07');
+                setDueDate('2026-07-20');
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Buat Tagihan Manual
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Import Panel */}
+      {isImportOpen && (
+        <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 space-y-4">
+          <div>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Upload className="h-4 w-4 text-emerald-400" />
+              Unggah / Tempel Data Pembayaran Berhasil
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+              Dukung copy-paste dari Sheets atau unggah CSV. Header yang direkomendasikan wajib diletakkan di baris pertama:<br/>
+              <span className="font-mono bg-white/10 text-white px-1.5 py-0.5 rounded text-[10px]">id_pelanggan, jenis_tagihan, periode_bulan, jumlah_bayar, no_referensi, tanggal_bayar, petugas_kasir</span>
+            </p>
+          </div>
+
+          <form onSubmit={handleImportCSVSubmit} className="space-y-3">
+            <textarea
+              id="csv-import-pembayaran"
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder={`id_pelanggan,jenis_tagihan,periode_bulan,jumlah_bayar,no_referensi,tanggal_bayar,petugas_kasir\nPLG-KJT-001,wifi,2026-06,150000,REF-883719,2026-06-15T08:30:00Z,kasir_budi\nPLG-KRJ-002,pln,2026-06,45000,REF-192837,2026-06-16T11:15:00Z,kasir_ani`}
+              className="w-full h-28 text-xs font-mono bg-slate-950/60 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/40 text-slate-300"
+            />
+
+            {importError && (
+              <div className="flex items-start gap-2 text-rose-400 text-xs bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{importError}</span>
+              </div>
+            )}
+
+            {importSuccess && (
+              <div className="flex items-start gap-2 text-emerald-400 text-xs bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{importSuccess}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsImportOpen(false)}
+                className="px-3 py-1.5 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold transition cursor-pointer"
+              >
+                Mulai Impor Transaksi
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Sync Status / Territory Warning for Cashier */}
       {currentUser.role === 'kasir' && currentUser.areaId && (

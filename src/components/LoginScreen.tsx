@@ -288,6 +288,26 @@ export default function LoginScreen({
                 Masuk Ke Aplikasi <Key className="h-4 w-4" />
               </button>
             </form>
+
+            {/* Quick Administrator Login Button as Requested */}
+            {users.find(u => u.role === 'admin') && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const admin = users.find(u => u.role === 'admin');
+                    if (admin) {
+                      setUsername(admin.username);
+                      setPassword('password');
+                      onLoginSuccess(admin);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-slate-900/60 hover:bg-slate-900 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Shield className="h-3.5 w-3.5 text-emerald-400" /> Masuk Sebagai Administrator
+                </button>
+              </div>
+            )}
           </div>
 
         </div>

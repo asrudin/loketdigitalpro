@@ -27,6 +27,29 @@ export interface FirestoreErrorInfo {
   }
 }
 
+/**
+ * Generates a stable, canonical JSON string representation of an object,
+ * sorting keys alphabetically and ignoring undefined/null values.
+ */
+export function canonicalStringify(obj: any): string {
+  if (obj === null || obj === undefined) return '';
+  if (typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(item => canonicalStringify(item)).join(',') + ']';
+  }
+  const keys = Object.keys(obj).sort();
+  const parts = keys
+    .map(key => {
+      const val = obj[key];
+      if (val === undefined || typeof val === 'function') return null;
+      return `${JSON.stringify(key)}:${canonicalStringify(val)}`;
+    })
+    .filter(Boolean);
+  return '{' + parts.join(',') + '}';
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -45,7 +68,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Sync Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  if (operationType === OperationType.WRITE) {
+    throw new Error(JSON.stringify(errInfo));
+  }
 }
 
 export interface CloudDbState {

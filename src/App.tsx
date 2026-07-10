@@ -13,7 +13,7 @@ import {
 
 // Firebase Sync and Auth
 import { initAuth, googleSignIn } from './lib/firebase';
-import { saveStateToFirestore, subscribeStateFromFirestore, mergeStates, getStateFromFirestore } from './lib/firebaseSync';
+import { saveStateToFirestore, subscribeStateFromFirestore, mergeStates, getStateFromFirestore, canonicalStringify } from './lib/firebaseSync';
 import { type User as FirebaseUser } from 'firebase/auth';
 
 // Component Imports
@@ -106,11 +106,11 @@ export default function App() {
     const unsubscribe = subscribeStateFromFirestore(
       firebaseUser.uid,
       async (cloudState) => {
-        const cloudStateStr = JSON.stringify(cloudState);
+        const cloudStateStr = canonicalStringify(cloudState);
         
         // Fetch current local state safely via ref
         const currentState = stateRef.current;
-        const currentStateStr = JSON.stringify(currentState);
+        const currentStateStr = canonicalStringify(currentState);
 
         // If the incoming cloud state is identical to our local state representation, skip setting state
         if (cloudStateStr === currentStateStr) {
@@ -132,7 +132,7 @@ export default function App() {
           setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
           setBudgets(mergedState.budgets || INITIAL_BUDGETS);
 
-          const mergedStateStr = JSON.stringify(mergedState);
+          const mergedStateStr = canonicalStringify(mergedState);
           lastRemoteStateRef.current = mergedStateStr;
 
           // Push merged state back to cloud instantly so everything is in sync
@@ -155,7 +155,7 @@ export default function App() {
             setCashFlow(mergedState.cashFlow || []);
             setBudgets(mergedState.budgets || []);
 
-            const mergedStateStr = JSON.stringify(mergedState);
+            const mergedStateStr = canonicalStringify(mergedState);
             lastRemoteStateRef.current = mergedStateStr;
 
             // Instantly push back the merged state so other clients receive the merge
@@ -249,7 +249,7 @@ export default function App() {
         setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
         setBudgets(mergedState.budgets || INITIAL_BUDGETS);
         
-        lastRemoteStateRef.current = JSON.stringify(mergedState);
+        lastRemoteStateRef.current = canonicalStringify(mergedState);
       }
       
       setSyncSuccess(true);
@@ -277,7 +277,7 @@ export default function App() {
       cashFlow,
       budgets
     };
-    const currentStateStr = JSON.stringify(currentState);
+    const currentStateStr = canonicalStringify(currentState);
 
     // If local state matches last remote synchronized state, skip saving to prevent infinite updates
     if (currentStateStr === lastRemoteStateRef.current) {
@@ -919,6 +919,7 @@ export default function App() {
               onUpdateTagihan={handleUpdateTagihan}
               onDeleteTagihan={handleDeleteTagihan}
               onPayTagihanDirectly={handlePayTagihanDirectly}
+              onImportPembayaran={handleImportPembayaran}
             />
           )}
 
