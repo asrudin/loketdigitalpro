@@ -31,15 +31,35 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout }: SidebarProps) {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'kasir'] },
-    { id: 'pelanggan', label: 'Menu Pelanggan', icon: Users, roles: ['admin'] },
-    { id: 'tagihan', label: 'Tagihan Belum Bayar', icon: Receipt, roles: ['admin', 'kasir'] },
-    { id: 'pembayaran', label: 'Catat Pembayaran', icon: UserCheck, roles: ['admin', 'kasir'] },
-    { id: 'petugas', label: 'Akun Petugas & Area Desa', icon: MapPin, roles: ['admin'] },
-    { id: 'keuangan', label: 'Arus Kas (Masuk/Keluar)', icon: Wallet, roles: ['admin'] },
-    { id: 'planning', label: 'Planning Keuangan', icon: TrendingUp, roles: ['admin'] },
-    { id: 'backup', label: 'Backup & Restore', icon: Database, roles: ['admin'] },
+  const menuGroups = [
+    {
+      title: 'DASHBOARD',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'kasir'] },
+      ]
+    },
+    {
+      title: 'MASTER DATA',
+      items: [
+        { id: 'pelanggan', label: 'Pelanggan', icon: Users, roles: ['admin'] },
+        { id: 'petugas', label: 'Akun Petugas & Area Desa', icon: MapPin, roles: ['admin'] },
+      ]
+    },
+    {
+      title: 'PEMBAYARAN & KEUANGAN',
+      items: [
+        { id: 'tagihan', label: 'Tagihan Belum Bayar', icon: Receipt, roles: ['admin', 'kasir'] },
+        { id: 'pembayaran', label: 'Catat Pembayaran', icon: UserCheck, roles: ['admin', 'kasir'] },
+        { id: 'keuangan', label: 'Arus Kas (Masuk/Keluar)', icon: Wallet, roles: ['admin'] },
+        { id: 'planning', label: 'Planning Keuangan', icon: TrendingUp, roles: ['admin'] },
+      ]
+    },
+    {
+      title: 'SISTEM',
+      items: [
+        { id: 'backup', label: 'Backup & Restore', icon: Database, roles: ['admin'] },
+      ]
+    }
   ];
 
   return (
@@ -47,7 +67,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
       {/* Brand Header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="h-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-emerald-500/20">
+          <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-emerald-500/20">
             LD
           </div>
           <div>
@@ -59,7 +79,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
 
       {/* Profile Card */}
       <div className="p-4 mx-3 my-4 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-sm text-slate-200 uppercase border border-white/10">
+        <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-sm text-slate-200 uppercase border border-white/10 shrink-0">
           {currentUser.name.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
@@ -74,29 +94,44 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
         </div>
       </div>
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
-          const isAllowed = item.roles.includes(currentUser.role);
-          if (!isAllowed) return null;
-
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
+      {/* Navigation Menu with Grouping */}
+      <nav className="flex-1 px-3 space-y-4 overflow-y-auto pb-4">
+        {menuGroups.map((group, groupIdx) => {
+          // Filter items that are allowed for current user role
+          const allowedItems = group.items.filter(item => item.roles.includes(currentUser.role));
+          if (allowedItems.length === 0) return null;
 
           return (
-            <button
-              id={`sidebar-btn-${item.id}`}
-              key={item.id}
-              onClick={() => setActiveTab(item.id as ActiveTab)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium tracking-wide transition duration-150 cursor-pointer ${
-                isActive 
-                  ? 'bg-white/20 text-white font-semibold border-l-2 border-emerald-400' 
-                  : 'text-slate-300 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Icon className={`h-4 w-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-              {item.label}
-            </button>
+            <div key={groupIdx} className="space-y-1.5 animate-in fade-in duration-300">
+              {/* Category Header Label */}
+              <div className="px-3 text-[9px] font-bold text-slate-400 tracking-widest uppercase">
+                {group.title}
+              </div>
+
+              {/* Group Items */}
+              <div className="space-y-0.5">
+                {allowedItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+
+                  return (
+                    <button
+                      id={`sidebar-btn-${item.id}`}
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id as ActiveTab)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium tracking-wide transition duration-150 cursor-pointer ${
+                        isActive 
+                          ? 'bg-white/20 text-white font-semibold border-l-2 border-emerald-400' 
+                          : 'text-slate-300 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>

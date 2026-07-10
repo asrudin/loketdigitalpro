@@ -37,6 +37,62 @@ export default function KeuanganManager({
   const [search, setSearch] = useState('');
   const [editingCashFlow, setEditingCashFlow] = useState<CashFlow | null>(null);
 
+  // Print Report Dialog States
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printMonth, setPrintMonth] = useState<number>(new Date().getMonth());
+  const [printYear, setPrintYear] = useState<number>(new Date().getFullYear());
+  const [treasurerName, setTreasurerName] = useState('Siti Rahma, S.E.');
+  const [villageHeadName, setVillageHeadName] = useState('H. Ahmad Fauzi');
+  const [printDate, setPrintDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const monthsList = [
+    { value: 0, label: 'Januari' },
+    { value: 1, label: 'Februari' },
+    { value: 2, label: 'Maret' },
+    { value: 3, label: 'April' },
+    { value: 4, label: 'Mei' },
+    { value: 5, label: 'Juni' },
+    { value: 6, label: 'Juli' },
+    { value: 7, label: 'Agustus' },
+    { value: 8, label: 'September' },
+    { value: 9, label: 'Oktober' },
+    { value: 10, label: 'November' },
+    { value: 11, label: 'Desember' }
+  ];
+
+  const yearsList = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+
+  // Filter flows for print
+  const reportFlows = cashFlow.filter(cf => {
+    const d = new Date(cf.date);
+    return d.getMonth() === printMonth && d.getFullYear() === printYear;
+  });
+
+  const reportTotalMasuk = reportFlows.filter(cf => cf.type === 'masuk').reduce((sum, cf) => sum + cf.amount, 0);
+  const reportTotalKeluar = reportFlows.filter(cf => cf.type === 'keluar').reduce((sum, cf) => sum + cf.amount, 0);
+  const reportSaldoNetto = reportTotalMasuk - reportTotalKeluar;
+
+  // Aggregate by Category for summary inside report
+  const reportIncomingByCat = reportFlows.filter(cf => cf.type === 'masuk').reduce((acc, cf) => {
+    acc[cf.category] = (acc[cf.category] || 0) + cf.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const reportOutgoingByCat = reportFlows.filter(cf => cf.type === 'keluar').reduce((acc, cf) => {
+    acc[cf.category] = (acc[cf.category] || 0) + cf.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const formatIndonesianDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const year = parts[0];
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return `${day} ${monthsList[monthIdx]?.label || ''} ${year}`;
+  };
+
   // Cashflow Form states
   const [type, setType] = useState<'masuk' | 'keluar'>('masuk');
   const [category, setCategory] = useState('Operasional');
@@ -238,11 +294,11 @@ export default function KeuanganManager({
           </button>
           <button
             id="btn-print-report"
-            onClick={handlePrintReport}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-lg text-xs font-bold border border-white/10 cursor-pointer transition"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-bold cursor-pointer transition"
           >
             <Printer className="h-3.5 w-3.5" />
-            Cetak Laporan
+            Cetak Laporan Bulanan
           </button>
           <button
             id="btn-export-kas"
@@ -650,6 +706,435 @@ export default function KeuanganManager({
           </div>
         </div>
       )}
+
+      {/* Cetak Laporan Bulanan Modal */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="glass-panel-heavy w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 overflow-hidden flex flex-col my-8">
+            {/* Header */}
+            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                  <Printer className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cetak Laporan Bulanan Resmi</h2>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Konfigurasi data, nama penandatangan, dan cetak laporan arus kas bulanan desa</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsPrintModalOpen(false)} 
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
+              {/* Left Column: Form Controls */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-4">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Filter Periode</h3>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bulan Laporan</label>
+                    <select
+                      value={printMonth}
+                      onChange={(e) => setPrintMonth(Number(e.target.value))}
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    >
+                      {monthsList.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tahun Laporan</label>
+                    <select
+                      value={printYear}
+                      onChange={(e) => setPrintYear(Number(e.target.value))}
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    >
+                      {yearsList.map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="glass-card p-4 rounded-2xl border border-white/10 space-y-4">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Pengesahan (Tanda Tangan)</h3>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Bendahara Desa</label>
+                    <input
+                      type="text"
+                      value={treasurerName}
+                      onChange={(e) => setTreasurerName(e.target.value)}
+                      placeholder="Siti Rahma, S.E."
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Kepala Desa</label>
+                    <input
+                      type="text"
+                      value={villageHeadName}
+                      onChange={(e) => setVillageHeadName(e.target.value)}
+                      placeholder="H. Ahmad Fauzi"
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tanggal Cetak Dokumen</label>
+                    <input
+                      type="date"
+                      value={printDate}
+                      onChange={(e) => setPrintDate(e.target.value)}
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintModalOpen(false)}
+                    className="flex-1 px-4 py-2.5 bg-white/5 border border-white/5 text-slate-300 rounded-xl text-xs font-bold hover:bg-white/10 cursor-pointer transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="flex-1 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 cursor-pointer transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Cetak Fisik / PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Live High-fidelity Print Preview */}
+              <div className="lg:col-span-8 flex flex-col space-y-3">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Pratinjau Kertas Resmi (A4)
+                </span>
+                
+                <div className="flex-1 max-h-[520px] overflow-y-auto bg-white p-8 rounded-2xl shadow-inner text-black border border-slate-300/40 relative font-serif">
+                  {/* Kop Surat Desa */}
+                  <div className="text-center border-b-[3px] border-double border-black pb-4 mb-5">
+                    <h4 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">PEMERINTAH KABUPATEN MALANG</h4>
+                    <h5 className="text-sm font-extrabold tracking-wide uppercase text-black leading-tight">KECAMATAN SINGOSARI • DESA KRAJAN</h5>
+                    <p className="text-[10px] font-semibold text-black uppercase mt-1">KANTOR PENGELOLA AIR BERSIH & LAYANAN MANDIRI LOKET DIGITAL PRO</p>
+                    <p className="text-[9px] text-gray-700 italic mt-0.5">Jl. Raya Krajan Tengah No. 45, Singosari, Malang, Jawa Timur | Telp: 0812-3456-7890</p>
+                  </div>
+
+                  {/* Judul Laporan */}
+                  <div className="text-center mb-6">
+                    <h3 className="text-xs font-bold tracking-wider uppercase text-black underline">LAPORAN PERTANGGUNGJAWABAN REALISASI ARUS KAS BULANAN</h3>
+                    <p className="text-[10px] font-medium text-black uppercase mt-1">Periode: {monthsList[printMonth]?.label} {printYear}</p>
+                  </div>
+
+                  {/* Ringkasan Finansial */}
+                  <div className="grid grid-cols-3 border border-black rounded divide-x divide-black mb-6 bg-slate-50 text-[10px]">
+                    <div className="p-3 text-center">
+                      <span className="font-bold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">TOTAL PEMASUKAN</span>
+                      <span className="font-mono text-xs font-bold text-black">{formatRupiah(reportTotalMasuk)}</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <span className="font-bold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">TOTAL PENGELUARAN</span>
+                      <span className="font-mono text-xs font-bold text-black">{formatRupiah(reportTotalKeluar)}</span>
+                    </div>
+                    <div className="p-3 text-center bg-gray-100">
+                      <span className="font-bold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">SURPLUS / DEFISIT BERSIH</span>
+                      <span className={`font-mono text-xs font-bold ${reportSaldoNetto >= 0 ? 'text-black' : 'text-red-700'}`}>
+                        {formatRupiah(reportSaldoNetto)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Kategori Breakdown */}
+                  <div className="grid grid-cols-2 gap-4 mb-6 text-[9px] font-sans">
+                    {/* Rekap Pemasukan */}
+                    <div className="border border-black p-2 rounded">
+                      <p className="font-extrabold uppercase bg-gray-100 text-black px-2 py-1 border-b border-black text-center mb-2">REKAPITULASI PEMASUKAN</p>
+                      {Object.keys(reportIncomingByCat).length === 0 ? (
+                        <p className="text-[9px] text-gray-500 text-center py-2 italic">Tidak ada pendapatan</p>
+                      ) : (
+                        <table className="w-full">
+                          <tbody>
+                            {Object.entries(reportIncomingByCat).map(([cat, amt]) => (
+                              <tr key={cat} className="border-b border-gray-100 last:border-0">
+                                <td className="py-1 text-gray-800">{cat}</td>
+                                <td className="py-1 text-right font-bold text-black font-mono">{formatRupiah(amt)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    {/* Rekap Pengeluaran */}
+                    <div className="border border-black p-2 rounded">
+                      <p className="font-extrabold uppercase bg-gray-100 text-black px-2 py-1 border-b border-black text-center mb-2">REKAPITULASI PENGELUARAN</p>
+                      {Object.keys(reportOutgoingByCat).length === 0 ? (
+                        <p className="text-[9px] text-gray-500 text-center py-2 italic">Tidak ada pengeluaran</p>
+                      ) : (
+                        <table className="w-full">
+                          <tbody>
+                            {Object.entries(reportOutgoingByCat).map(([cat, amt]) => (
+                              <tr key={cat} className="border-b border-gray-100 last:border-0">
+                                <td className="py-1 text-gray-800">{cat}</td>
+                                <td className="py-1 text-right font-bold text-black font-mono">{formatRupiah(amt)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rincian Transaksi */}
+                  <div className="mb-8 font-sans">
+                    <p className="text-[9px] font-extrabold uppercase mb-2">RINCIAN JURNAL TRANSAKSI KAS MASUK-KELUAR :</p>
+                    <table className="w-full text-left border-collapse border border-black text-[8px]">
+                      <thead>
+                        <tr className="border-b border-black bg-gray-100 font-bold uppercase text-black text-[7.5px]">
+                          <th className="py-1.5 px-2 border-r border-black w-14">Tanggal</th>
+                          <th className="py-1.5 px-2 border-r border-black w-24">Kategori</th>
+                          <th className="py-1.5 px-2 border-r border-black">Keterangan</th>
+                          <th className="py-1.5 px-2 border-r border-black text-right w-20">Debet (Masuk)</th>
+                          <th className="py-1.5 px-2 text-right w-20">Kredit (Keluar)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/80">
+                        {reportFlows.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center italic text-gray-500">
+                              Tidak ada catatan transaksi keuangan pada periode ini.
+                            </td>
+                          </tr>
+                        ) : (
+                          reportFlows.map((cf) => (
+                            <tr key={cf.id} className="align-top">
+                              <td className="py-1.5 px-2 border-r border-black font-mono font-bold text-gray-700">{cf.date}</td>
+                              <td className="py-1.5 px-2 border-r border-black font-bold uppercase">{cf.category}</td>
+                              <td className="py-1.5 px-2 border-r border-black text-gray-800">{cf.description}</td>
+                              <td className="py-1.5 px-2 border-r border-black text-right font-mono font-bold text-black">
+                                {cf.type === 'masuk' ? formatRupiah(cf.amount) : '-'}
+                              </td>
+                              <td className="py-1.5 px-2 text-right font-mono font-bold text-black">
+                                {cf.type === 'keluar' ? formatRupiah(cf.amount) : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tanda Tangan Pengesahan */}
+                  <div className="grid grid-cols-2 text-center text-[9px] font-sans gap-8 mt-12 pt-4">
+                    <div>
+                      <p className="font-bold mb-12">
+                        Mengetahui,<br/>
+                        Kepala Desa Krajan
+                      </p>
+                      <p className="font-bold text-black underline uppercase">{villageHeadName || 'H. Ahmad Fauzi'}</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Pemerintah Desa Krajan</p>
+                    </div>
+
+                    <div>
+                      <p className="font-bold mb-12 text-gray-900">
+                        Malang, {formatIndonesianDate(printDate)}<br/>
+                        Dibuat Oleh,<br/>
+                        Bendahara Pengelola
+                      </p>
+                      <p className="font-bold text-black underline uppercase">{treasurerName || 'Siti Rahma, S.E.'}</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Layanan Loket Digital</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 
+        This is a hidden, print-only wrapper.
+        The styles in the injected CSS block make this block display: block !important ONLY during media-print execution.
+      */}
+      <div id="printable-monthly-report-container" className="hidden font-serif">
+        {/* Kop Surat Desa */}
+        <div className="text-center border-b-[4px] border-double border-black pb-4 mb-6">
+          <h1 className="text-lg font-extrabold tracking-wide uppercase text-black leading-tight">PEMERINTAH KABUPATEN MALANG</h1>
+          <h2 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">KECAMATAN SINGOSARI • DESA KRAJAN</h2>
+          <p className="text-[11px] font-bold text-black uppercase mt-1">KANTOR PENGELOLA AIR BERSIH & LAYANAN MANDIRI LOKET DIGITAL PRO</p>
+          <p className="text-[10px] text-gray-800 italic mt-0.5">Jl. Raya Krajan Tengah No. 45, Singosari, Malang, Jawa Timur | Telp: 0812-3456-7890</p>
+        </div>
+
+        {/* Judul Laporan */}
+        <div className="text-center mb-6">
+          <h2 className="text-sm font-extrabold tracking-wider uppercase text-black underline">LAPORAN PERTANGGUNGJAWABAN REALISASI ARUS KAS BULANAN</h2>
+          <p className="text-[11px] font-bold text-black uppercase mt-1">Periode: {monthsList[printMonth]?.label} {printYear}</p>
+        </div>
+
+        {/* Ringkasan Finansial */}
+        <div className="grid grid-cols-3 border border-black divide-x divide-black mb-6 bg-gray-50 text-[10px]">
+          <div className="p-3 text-center">
+            <span className="font-extrabold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">TOTAL PEMASUKAN</span>
+            <span className="font-mono text-xs font-bold text-black">{formatRupiah(reportTotalMasuk)}</span>
+          </div>
+          <div className="p-3 text-center">
+            <span className="font-extrabold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">TOTAL PENGELUARAN</span>
+            <span className="font-mono text-xs font-bold text-black">{formatRupiah(reportTotalKeluar)}</span>
+          </div>
+          <div className="p-3 text-center bg-gray-100">
+            <span className="font-extrabold block text-gray-700 uppercase text-[8px] tracking-wide mb-1">SURPLUS / DEFISIT BERSIH</span>
+            <span className={`font-mono text-xs font-bold ${reportSaldoNetto >= 0 ? 'text-black' : 'text-red-700'}`}>
+              {formatRupiah(reportSaldoNetto)}
+            </span>
+          </div>
+        </div>
+
+        {/* Kategori Breakdown */}
+        <div className="grid grid-cols-2 gap-6 mb-6 text-[9px] font-sans">
+          {/* Rekap Pemasukan */}
+          <div className="border border-black p-3 rounded">
+            <p className="font-extrabold uppercase bg-gray-100 text-black px-2 py-1 border-b border-black text-center mb-2">REKAPITULASI PEMASUKAN</p>
+            {Object.keys(reportIncomingByCat).length === 0 ? (
+              <p className="text-[9px] text-gray-500 text-center py-2 italic">Tidak ada pendapatan</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <tbody>
+                  {Object.entries(reportIncomingByCat).map(([cat, amt]) => (
+                    <tr key={cat} className="border-b border-gray-200 last:border-0">
+                      <td className="py-1 text-gray-800">{cat}</td>
+                      <td className="py-1 text-right font-bold text-black font-mono">{formatRupiah(amt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Rekap Pengeluaran */}
+          <div className="border border-black p-3 rounded">
+            <p className="font-extrabold uppercase bg-gray-100 text-black px-2 py-1 border-b border-black text-center mb-2">REKAPITULASI PENGELUARAN</p>
+            {Object.keys(reportOutgoingByCat).length === 0 ? (
+              <p className="text-[9px] text-gray-500 text-center py-2 italic">Tidak ada pengeluaran</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <tbody>
+                  {Object.entries(reportOutgoingByCat).map(([cat, amt]) => (
+                    <tr key={cat} className="border-b border-gray-200 last:border-0">
+                      <td className="py-1 text-gray-800">{cat}</td>
+                      <td className="py-1 text-right font-bold text-black font-mono">{formatRupiah(amt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Rincian Transaksi */}
+        <div className="mb-8 font-sans">
+          <p className="text-[9px] font-extrabold uppercase mb-2">RINCIAN JURNAL TRANSAKSI KAS MASUK-KELUAR :</p>
+          <table className="w-full text-left border-collapse border border-black text-[8px]">
+            <thead>
+              <tr className="border-b border-black bg-gray-100 font-bold uppercase text-black text-[7.5px]">
+                <th className="py-1.5 px-2 border-r border-black w-14">Tanggal</th>
+                <th className="py-1.5 px-2 border-r border-black w-24">Kategori</th>
+                <th className="py-1.5 px-2 border-r border-black">Keterangan</th>
+                <th className="py-1.5 px-2 border-r border-black text-right w-20">Debet (Masuk)</th>
+                <th className="py-1.5 px-2 text-right w-20">Kredit (Keluar)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black">
+              {reportFlows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-4 text-center italic text-gray-500">
+                    Tidak ada catatan transaksi keuangan pada periode ini.
+                  </td>
+                </tr>
+              ) : (
+                reportFlows.map((cf) => (
+                  <tr key={cf.id} className="align-top">
+                    <td className="py-1.5 px-2 border-r border-black font-mono font-bold text-gray-700">{cf.date}</td>
+                    <td className="py-1.5 px-2 border-r border-black font-bold uppercase">{cf.category}</td>
+                    <td className="py-1.5 px-2 border-r border-black text-gray-800">{cf.description}</td>
+                    <td className="py-1.5 px-2 border-r border-black text-right font-mono font-bold text-black">
+                      {cf.type === 'masuk' ? formatRupiah(cf.amount) : '-'}
+                    </td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold text-black">
+                      {cf.type === 'keluar' ? formatRupiah(cf.amount) : '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Tanda Tangan Pengesahan */}
+        <div className="grid grid-cols-2 text-center text-[10px] font-sans gap-8 mt-12 pt-4">
+          <div>
+            <p className="font-bold mb-14">
+              Mengetahui,<br/>
+              Kepala Desa Krajan
+            </p>
+            <p className="font-bold text-black underline uppercase">{villageHeadName}</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Pemerintah Desa Krajan</p>
+          </div>
+
+          <div>
+            <p className="font-bold mb-14 text-gray-900">
+              Malang, {formatIndonesianDate(printDate)}<br/>
+              Dibuat Oleh,<br/>
+              Bendahara Pengelola
+            </p>
+            <p className="font-bold text-black underline uppercase">{treasurerName}</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Layanan Loket Digital</p>
+          </div>
+        </div>
+      </div>
+
+      {/* CSS overrides specifically for printing */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          /* Hide screen contents */
+          #root, .fixed, .glass-card, header, nav, aside, button, select, input, textarea, .modal {
+            display: none !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            visibility: hidden !important;
+          }
+          /* Style only printable section */
+          #printable-monthly-report-container {
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            color: black !important;
+            padding: 20px !important;
+          }
+          #printable-monthly-report-container * {
+            visibility: visible !important;
+            color: black !important;
+            background-color: transparent !important;
+          }
+        }
+      `}} />
     </div>
   );
 }
