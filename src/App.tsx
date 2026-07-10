@@ -105,7 +105,7 @@ export default function App() {
 
     const unsubscribe = subscribeStateFromFirestore(
       firebaseUser.uid,
-      async (cloudState) => {
+      async (cloudState, exists) => {
         const cloudStateStr = canonicalStringify(cloudState);
         
         // Fetch current local state safely via ref
@@ -122,24 +122,23 @@ export default function App() {
 
         if (isFirstLoad) {
           isFirstLoad = false;
-          // Initial Load: Auto-merge local and cloud states seamlessly
-          const mergedState = mergeStates(currentState, cloudState);
-          
-          setUsers(mergedState.users || INITIAL_USERS);
-          setAreas(mergedState.areas || INITIAL_AREAS);
-          setPelanggan(mergedState.pelanggan || INITIAL_PELANGGAN);
-          setTagihan(mergedState.tagihan || INITIAL_TAGIHAN);
-          setCashFlow(mergedState.cashFlow || INITIAL_CASH_FLOW);
-          setBudgets(mergedState.budgets || INITIAL_BUDGETS);
-
-          const mergedStateStr = canonicalStringify(mergedState);
-          lastRemoteStateRef.current = mergedStateStr;
-
-          // Push merged state back to cloud instantly so everything is in sync
-          try {
-            await saveStateToFirestore(firebaseUser.uid, mergedState);
-          } catch (e) {
-            console.error("Gagal menyimpan hasil merge awal:", e);
+          if (exists) {
+            // Adopt existing cloud state directly to prevent polluting the cloud with initial local mock data
+            setUsers(cloudState.users || []);
+            setAreas(cloudState.areas || []);
+            setPelanggan(cloudState.pelanggan || []);
+            setTagihan(cloudState.tagihan || []);
+            setCashFlow(cloudState.cashFlow || []);
+            setBudgets(cloudState.budgets || []);
+            lastRemoteStateRef.current = cloudStateStr;
+          } else {
+            // Document does not exist in Cloud yet: initialize Cloud with our current local state
+            lastRemoteStateRef.current = currentStateStr;
+            try {
+              await saveStateToFirestore(firebaseUser.uid, currentState);
+            } catch (e) {
+              console.error("Gagal menginisialisasi state awal ke cloud:", e);
+            }
           }
         } else {
           // Check if there are local un-saved changes compared to the last synchronized remote state

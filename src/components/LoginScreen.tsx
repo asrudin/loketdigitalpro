@@ -58,6 +58,15 @@ export default function LoginScreen({
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState('');
 
+  // Cloud Sync Settings States
+  const [showSyncConfig, setShowSyncConfig] = useState(false);
+  const [tempSyncId, setTempSyncId] = useState(cloudSyncId);
+  const [isSavingId, setIsSavingId] = useState(false);
+
+  useEffect(() => {
+    setTempSyncId(cloudSyncId);
+  }, [cloudSyncId]);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const user = users.find(
@@ -302,12 +311,75 @@ export default function LoginScreen({
                       onLoginSuccess(admin);
                     }
                   }}
-                  className="w-full py-2.5 bg-slate-900/60 hover:bg-slate-900 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  className="w-full py-2.5 bg-slate-900/60 hover:bg-slate-900 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-md mb-3"
                 >
                   <Shield className="h-3.5 w-3.5 text-emerald-400" /> Masuk Sebagai Administrator
                 </button>
               </div>
             )}
+
+            {/* Expandable Cloud Sync ID Configuration Panel */}
+            <div className="mt-2 border border-white/10 rounded-xl bg-slate-950/40 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowSyncConfig(!showSyncConfig)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 hover:bg-white/5 text-[11px] font-bold text-slate-300 uppercase tracking-wider transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4 text-emerald-400" />
+                  Pengaturan Sinkronisasi Cloud
+                </span>
+                <Settings className={`h-3.5 w-3.5 text-slate-400 transition-transform ${showSyncConfig ? 'rotate-90 text-emerald-400' : ''}`} />
+              </button>
+
+              {showSyncConfig && (
+                <div className="px-3.5 pb-3.5 pt-1 space-y-3 border-t border-white/5">
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Untuk menggunakan sistem kasir bersama di beberapa perangkat (hp/komputer/browser lain), masukkan ID Sinkronisasi yang sama di seluruh perangkat Anda.
+                  </p>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">ID Database Cloud:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={tempSyncId}
+                        onChange={(e) => setTempSyncId(e.target.value)}
+                        placeholder="Contoh: loket-desa-gemblengan-db"
+                        className="flex-1 text-[11px] glass-input rounded-lg px-2.5 py-1.5 focus:outline-none font-mono bg-slate-950 text-white border border-white/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!tempSyncId.trim()) return;
+                          setIsSavingId(true);
+                          try {
+                            await onUpdateCloudSyncId(tempSyncId.trim());
+                            alert('ID Sinkronisasi berhasil diperbarui!');
+                          } catch (e) {
+                            alert('Gagal memperbarui ID Sinkronisasi');
+                          } finally {
+                            setIsSavingId(false);
+                          }
+                        }}
+                        disabled={isSavingId || syncing}
+                        className="px-2.5 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {isSavingId ? 'Menyambungkan...' : 'Sambungkan'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] bg-white/5 p-2 rounded-lg border border-white/5">
+                    <span className="text-slate-400 font-medium">Status Koneksi Cloud:</span>
+                    {syncError ? (
+                      <span className="text-rose-400 font-bold flex items-center gap-1">❌ offline</span>
+                    ) : (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1 animate-pulse">🟢 Terhubung & Aktif</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>

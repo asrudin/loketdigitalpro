@@ -161,7 +161,7 @@ export function mergeStates(local: CloudDbState, cloud: CloudDbState): CloudDbSt
  */
 export function subscribeStateFromFirestore(
   userId: string,
-  onUpdate: (state: CloudDbState) => void,
+  onUpdate: (state: CloudDbState, exists: boolean) => void,
   onError: (error: any) => void
 ) {
   const docPath = `userStates/${userId}`;
@@ -178,7 +178,7 @@ export function subscribeStateFromFirestore(
           tagihan: data.tagihan || [],
           cashFlow: data.cashFlow || [],
           budgets: data.budgets || []
-        });
+        }, true);
       } else {
         // Document does not exist yet
         onUpdate({
@@ -188,7 +188,7 @@ export function subscribeStateFromFirestore(
           tagihan: [],
           cashFlow: [],
           budgets: []
-        });
+        }, false);
       }
     },
     (err) => {

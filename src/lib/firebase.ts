@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support both local development config and environment variables for GitHub/Vercel/production support
@@ -32,13 +32,32 @@ const app = initializeApp(resolvedConfig);
 export const auth = getAuth(app);
 
 let firestoreInstance: any;
-try {
-  const settings = {
+
+const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+const getFirestoreSettings = () => {
+  const baseSettings: any = {
     experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
   };
+
+  if (isIframe) {
+    console.log("Firestore: Running inside iframe, using memory local cache to bypass IndexedDB multi-tab locking restrictions.");
+    baseSettings.localCache = memoryLocalCache();
+  } else {
+    try {
+      baseSettings.localCache = persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      });
+    } catch (e) {
+      console.warn("Firestore: Persistent cache not supported, falling back to memory cache:", e);
+      baseSettings.localCache = memoryLocalCache();
+    }
+  }
+  return baseSettings;
+};
+
+try {
+  const settings = getFirestoreSettings();
   if (customDbId) {
     firestoreInstance = initializeFirestore(app, settings, customDbId);
   } else {
@@ -49,12 +68,10 @@ try {
   try {
     firestoreInstance = initializeFirestore(app, {
       experimentalForceLongPolling: true,
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
+      localCache: memoryLocalCache(),
     });
   } catch (err2) {
-    console.error("Failed to initialize default Firestore:", err2);
+    console.error("Failed to initialize default Firestore with memory cache:", err2);
   }
 }
 
