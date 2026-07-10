@@ -68,11 +68,11 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, onLogout
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-emerald-500/20">
-            LD
+            SP
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white leading-none tracking-tight">Loket Digital <span className="text-emerald-400 italic font-medium">Pro</span></h1>
-            <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Sistem Keuangan</p>
+            <h1 className="text-sm font-bold text-white leading-none tracking-tight">Simulti <span className="text-emerald-400 italic font-medium">Pro</span></h1>
+            <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Sistem Multi Tagihan</p>
           </div>
         </div>
       </div>

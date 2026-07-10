@@ -193,7 +193,7 @@ export const INDEX_HTML_TEMPLATE = `<!DOCTYPE html>
   <div class="w-full max-w-xl bg-slate-800 rounded-3xl shadow-2xl border border-slate-700 p-6 md:p-8 space-y-6">
     <div class="border-b border-slate-700 pb-4 flex justify-between items-center">
       <div>
-        <h1 class="text-lg font-bold text-white tracking-tight">Loket Digital Quick-Pay</h1>
+        <h1 class="text-lg font-bold text-white tracking-tight">Simulti Pro Quick-Pay</h1>
         <p class="text-xs text-slate-400 mt-1">Formulir Pembayaran Cepat Terintegrasi Google Sheets</p>
       </div>
       <div class="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">

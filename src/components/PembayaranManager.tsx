@@ -412,8 +412,8 @@ export default function PembayaranManager({
                   <div className="absolute -top-1 left-0 right-0 h-1 bg-[radial-gradient(circle_at_center,_transparent_4px,_#f1f5f9_4px)] bg-[length:12px_8px] pointer-events-none" />
 
                   <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-300">
-                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">KASIR BUMDES LOKET DIGITAL</h2>
-                    <p className="text-[9px] text-slate-500">Pusat Layanan Tagihan Pelanggan</p>
+                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">KASIR SIMULTI PRO</h2>
+                    <p className="text-[9px] text-slate-500">Sistem Pembayaran Multi Tagihan</p>
                     <p className="text-[9px] text-slate-400">Dusun {areaName}</p>
                   </div>
 

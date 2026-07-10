@@ -245,8 +245,8 @@ export default function App() {
         const mockUser = {
           uid: newId,
           isAnonymous: true,
-          displayName: 'Loket Digital',
-          email: 'otomatis@loket.digital'
+          displayName: 'Simulti Pro',
+          email: 'otomatis@simulti.pro'
         } as FirebaseUser;
         setFirebaseUser(mockUser);
         setHasLoadedFromCloud(true);
@@ -268,8 +268,8 @@ export default function App() {
         const mockUser = {
           uid: newId,
           isAnonymous: true,
-          displayName: 'Loket Digital',
-          email: 'otomatis@loket.digital'
+          displayName: 'Simulti Pro',
+          email: 'otomatis@simulti.pro'
         } as FirebaseUser;
         setFirebaseUser(mockUser);
         setHasLoadedFromCloud(true);

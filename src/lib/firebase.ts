@@ -111,8 +111,8 @@ export const initAuth = (
         onAuthSuccess({
           uid: cloudUserId,
           isAnonymous: true,
-          displayName: 'Loket Digital',
-          email: 'otomatis@loket.digital'
+          displayName: 'Simulti Pro',
+          email: 'otomatis@simulti.pro'
         } as any, "");
       }
     }

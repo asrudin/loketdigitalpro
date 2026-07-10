@@ -164,11 +164,11 @@ export default function LoginScreen({
                   <Receipt className="h-5 w-5" />
                 </div>
                 <h1 className="text-2xl font-black text-white tracking-tight uppercase">
-                  Loket Digital <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Pro</span>
+                  Simulti <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Pro</span>
                 </h1>
               </div>
               <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                Platform penagihan kasir & keuangan desa terpadu untuk pengelolaan tagihan WiFi internet, listrik PLN pascabayar, dan air bersih PDAM.
+                Sistem Pembayaran Multi Tagihan untuk pengelolaan tagihan WiFi internet, listrik PLN pascabayar, dan air bersih PDAM.
               </p>
             </div>
 
@@ -218,9 +218,9 @@ export default function LoginScreen({
                 <Receipt className="h-5 w-5" />
               </div>
               <h1 className="text-xl font-extrabold text-white tracking-tight uppercase">
-                Loket Digital <span className="text-emerald-400">Pro</span>
+                Simulti <span className="text-emerald-400">Pro</span>
               </h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Sistem Tagihan & Kasir Desa Terpadu</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Sistem Pembayaran Multi Tagihan</p>
             </div>
 
             {/* Panel Title */}
@@ -298,25 +298,7 @@ export default function LoginScreen({
               </button>
             </form>
 
-            {/* Quick Administrator Login Button as Requested */}
-            {users.find(u => u.role === 'admin') && (
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const admin = users.find(u => u.role === 'admin');
-                    if (admin) {
-                      setUsername(admin.username);
-                      setPassword('password');
-                      onLoginSuccess(admin);
-                    }
-                  }}
-                  className="w-full py-2.5 bg-slate-900/60 hover:bg-slate-900 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-md mb-3"
-                >
-                  <Shield className="h-3.5 w-3.5 text-emerald-400" /> Masuk Sebagai Administrator
-                </button>
-              </div>
-            )}
+            {/* Quick Administrator Login Button has been hidden as requested */}
           </div>
 
         </div>
