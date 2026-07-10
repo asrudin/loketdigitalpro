@@ -399,6 +399,16 @@ export default function App() {
     setTagihan(prev => [newTagihan, ...prev]);
   };
 
+  const handleAddTagihanBulk = (newTags: Omit<Tagihan, 'id' | 'status'>[]) => {
+    const batchTimestamp = new Date().getTime();
+    const withIds: Tagihan[] = newTags.map((t, index) => ({
+      ...t,
+      id: `tag-${batchTimestamp}-${index}-${Math.floor(Math.random() * 1000000)}`,
+      status: 'unpaid'
+    }));
+    setTagihan(prev => [...withIds, ...prev]);
+  };
+
   const handleUpdateTagihan = (updated: Tagihan) => {
     setTagihan(prev => prev.map(t => t.id === updated.id ? updated : t));
   };
@@ -916,6 +926,7 @@ export default function App() {
               users={users}
               currentUser={currentUser}
               onAddTagihan={handleAddTagihan}
+              onAddTagihanBulk={handleAddTagihanBulk}
               onUpdateTagihan={handleUpdateTagihan}
               onDeleteTagihan={handleDeleteTagihan}
               onPayTagihanDirectly={handlePayTagihanDirectly}

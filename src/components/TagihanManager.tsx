@@ -23,6 +23,7 @@ interface TagihanManagerProps {
   users: User[];
   currentUser: User;
   onAddTagihan: (t: Omit<Tagihan, 'id' | 'status'>) => void;
+  onAddTagihanBulk: (t: Omit<Tagihan, 'id' | 'status'>[]) => void;
   onUpdateTagihan: (t: Tagihan) => void;
   onDeleteTagihan: (id: string) => void;
   onPayTagihanDirectly: (tagihanId: string) => void;
@@ -44,6 +45,7 @@ export default function TagihanManager({
   users,
   currentUser,
   onAddTagihan,
+  onAddTagihanBulk,
   onUpdateTagihan,
   onDeleteTagihan,
   onPayTagihanDirectly,
@@ -64,6 +66,43 @@ export default function TagihanManager({
   const [billMonth, setBillMonth] = useState('2026-07');
   const [dueDate, setDueDate] = useState('2026-07-20');
 
+  // Tagihan Masal (Mass Billing) Form States
+  const [massAreaId, setMassAreaId] = useState<string>('all');
+  const [massOfficerId, setMassOfficerId] = useState<string>('all');
+  const [massCheckedCustomerIds, setMassCheckedCustomerIds] = useState<string[]>([]);
+
+  // Helper to determine existing billing status
+  const getExistingBillStatus = (pelangganId: string, type: BillType, month: string) => {
+    const existing = tagihan.find(t => t.pelangganId === pelangganId && t.type === type && t.month === month);
+    if (!existing) return null;
+    return existing.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR';
+  };
+
+  // Compute eligible customers for mass billing
+  const massMatchingPelanggan = pelanggan.filter((p) => {
+    // Area filter
+    const matchesArea = massAreaId === 'all' || p.areaId === massAreaId;
+    
+    // Officer filter: Find user of role 'kasir' assigned to this customer's area
+    const areaOfficer = users.find(u => u.areaId === p.areaId && u.role === 'kasir');
+    const matchesOfficer = massOfficerId === 'all' || (areaOfficer && areaOfficer.id === massOfficerId);
+
+    // Filter by customer bill type (if specified)
+    const matchesBillType = !p.billType || p.billType === billType;
+
+    return matchesArea && matchesOfficer && matchesBillType;
+  });
+
+  // Automatically check all customers who don't already have a bill for this month & type
+  React.useEffect(() => {
+    if (isModalOpen && !editingTagihan) {
+      const autoChecked = massMatchingPelanggan
+        .filter(p => !getExistingBillStatus(p.id, billType, billMonth))
+        .map(p => p.id);
+      setMassCheckedCustomerIds(autoChecked);
+    }
+  }, [massAreaId, massOfficerId, billType, billMonth, isModalOpen, tagihan]);
+
   // Import states
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [csvText, setCsvText] = useState('');
@@ -79,9 +118,9 @@ export default function TagihanManager({
 
   const handleCreateBill = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetPelangganId || !billAmount || !billMonth) return;
 
     if (editingTagihan) {
+      if (!targetPelangganId || !billAmount || !billMonth) return;
       onUpdateTagihan({
         ...editingTagihan,
         pelangganId: targetPelangganId,
@@ -91,13 +130,45 @@ export default function TagihanManager({
         dueDate: dueDate || '2026-07-20',
       });
     } else {
-      onAddTagihan({
-        pelangganId: targetPelangganId,
-        type: billType,
-        amount: Number(billAmount),
-        month: billMonth,
-        dueDate: dueDate || '2026-07-20',
-      });
+      // Generate bulk bills
+      const selectedPelangganList = massMatchingPelanggan.filter(p => massCheckedCustomerIds.includes(p.id));
+      if (selectedPelangganList.length === 0) {
+        alert("Pilih setidaknya satu pelanggan untuk membuat tagihan masal!");
+        return;
+      }
+
+      const billsToCreate = selectedPelangganList
+        .map(p => {
+          // Check if bill already exists to prevent duplicate
+          const existing = getExistingBillStatus(p.id, billType, billMonth);
+          if (existing) return null; // skip
+
+          // Get amount: customer-specific or general input
+          const amount = p.nominalBulanan && p.nominalBulanan > 0 ? p.nominalBulanan : Number(billAmount);
+          
+          // Get due date: if customer has a custom day of month, e.g. 10, we can construct the due date for that month
+          let finalDueDate = dueDate;
+          if (p.jatuhTempo && p.jatuhTempo > 0) {
+            const dayStr = String(p.jatuhTempo).padStart(2, '0');
+            finalDueDate = `${billMonth}-${dayStr}`;
+          }
+
+          return {
+            pelangganId: p.id,
+            type: billType,
+            amount: amount,
+            month: billMonth,
+            dueDate: finalDueDate || '2026-07-20'
+          };
+        })
+        .filter((b): b is Omit<Tagihan, 'id' | 'status'> => b !== null);
+
+      if (billsToCreate.length > 0) {
+        onAddTagihanBulk(billsToCreate);
+        alert(`Berhasil membuat ${billsToCreate.length} tagihan masal baru untuk periode ${billMonth}!`);
+      } else {
+        alert("Semua pelanggan terpilih sudah ditagih sebelumnya pada periode & tipe ini.");
+      }
     }
 
     setIsModalOpen(false);
@@ -254,17 +325,19 @@ export default function TagihanManager({
               id="btn-open-add-bill"
               onClick={() => {
                 setEditingTagihan(null);
-                setTargetPelangganId(pelanggan[0]?.id || '');
+                setMassAreaId('all');
+                setMassOfficerId('all');
                 setBillType('wifi');
                 setBillAmount('150000');
                 setBillMonth('2026-07');
                 setDueDate('2026-07-20');
+                setMassCheckedCustomerIds([]);
                 setIsModalOpen(true);
               }}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />
-              Buat Tagihan Manual
+              Buat Tagihan Masal
             </button>
           )}
         </div>
@@ -512,98 +585,277 @@ export default function TagihanManager({
         </div>
       </div>
 
-      {/* Manual Bill Creator Modal (Admin Only) */}
+      {/* Billing Creator / Editor Modal (Admin Only) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel-heavy w-full max-w-md rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className={`glass-panel-heavy w-full ${editingTagihan ? 'max-w-md' : 'max-w-xl'} rounded-2xl shadow-2xl border border-white/10 overflow-hidden my-8`}>
             <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-                {editingTagihan ? 'Edit Tagihan Pelanggan' : 'Buat Tagihan Manual Baru'}
+                {editingTagihan ? 'Edit Tagihan Pelanggan' : 'Buat Tagihan Masal / Kolektif'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition">
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <form onSubmit={handleCreateBill} className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pilih Pelanggan</label>
-                <select
-                  id="form-bill-pelanggan"
-                  required
-                  value={targetPelangganId}
-                  onChange={(e) => setTargetPelangganId(e.target.value)}
-                  className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                >
-                  {pelanggan.map((p) => {
-                    const areaName = areas.find(a => a.id === p.areaId)?.name || '';
-                    return (
-                      <option key={p.id} value={p.id} className="bg-slate-950 text-white">{p.name} ({areaName})</option>
-                    );
-                  })}
-                </select>
-              </div>
+              {editingTagihan ? (
+                /* SINGLE BILL EDITOR UI */
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pilih Pelanggan</label>
+                    <select
+                      id="form-bill-pelanggan"
+                      required
+                      value={targetPelangganId}
+                      onChange={(e) => setTargetPelangganId(e.target.value)}
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    >
+                      {pelanggan.map((p) => {
+                        const areaName = areas.find(a => a.id === p.areaId)?.name || '';
+                        return (
+                          <option key={p.id} value={p.id} className="bg-slate-950 text-white">{p.name} ({areaName})</option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Utilitas</label>
-                  <select
-                    id="form-bill-type"
-                    value={billType}
-                    onChange={(e) => {
-                      const type = e.target.value as BillType;
-                      setBillType(type);
-                      if (type === 'wifi') setBillAmount('150000');
-                      else if (type === 'pln') setBillAmount('185000');
-                      else setBillAmount('45000');
-                    }}
-                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                  >
-                    <option value="wifi" className="bg-slate-950 text-white">WiFi Internet</option>
-                    <option value="pln" className="bg-slate-950 text-white">Listrik PLN</option>
-                    <option value="pdam" className="bg-slate-950 text-white">PDAM Air Bersih</option>
-                  </select>
-                </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Utilitas</label>
+                      <select
+                        id="form-bill-type"
+                        value={billType}
+                        onChange={(e) => {
+                          const type = e.target.value as BillType;
+                          setBillType(type);
+                          if (type === 'wifi') setBillAmount('150000');
+                          else if (type === 'pln') setBillAmount('185000');
+                          else setBillAmount('45000');
+                        }}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      >
+                        <option value="wifi" className="bg-slate-950 text-white">WiFi Internet</option>
+                        <option value="pln" className="bg-slate-950 text-white">Listrik PLN</option>
+                        <option value="pdam" className="bg-slate-950 text-white">PDAM Air Bersih</option>
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nominal Rupiah (Rp)</label>
-                  <input
-                    id="form-bill-amount"
-                    type="number"
-                    required
-                    value={billAmount}
-                    onChange={(e) => setBillAmount(e.target.value)}
-                    placeholder="150000"
-                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                  />
-                </div>
-              </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nominal Rupiah (Rp)</label>
+                      <input
+                        id="form-bill-amount"
+                        type="number"
+                        required
+                        value={billAmount}
+                        onChange={(e) => setBillAmount(e.target.value)}
+                        placeholder="150000"
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Periode Bulan</label>
-                  <input
-                    id="form-bill-month"
-                    type="month"
-                    required
-                    value={billMonth}
-                    onChange={(e) => setBillMonth(e.target.value)}
-                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                  />
-                </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Periode Bulan</label>
+                      <input
+                        id="form-bill-month"
+                        type="month"
+                        required
+                        value={billMonth}
+                        onChange={(e) => setBillMonth(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tanggal Jatuh Tempo</label>
-                  <input
-                    id="form-bill-due"
-                    type="date"
-                    required
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
-                  />
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tanggal Jatuh Tempo</label>
+                      <input
+                        id="form-bill-due"
+                        type="date"
+                        required
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* MASS BILLING GENERATOR UI */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Filter Wilayah Area</label>
+                      <select
+                        id="mass-bill-area"
+                        value={massAreaId}
+                        onChange={(e) => setMassAreaId(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none border border-emerald-500/20 bg-emerald-500/5"
+                      >
+                        <option value="all" className="bg-slate-950 text-white">Semua Wilayah (Dusun)</option>
+                        {areas.map((a) => (
+                          <option key={a.id} value={a.id} className="bg-slate-950 text-white">{a.name} ({a.code})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Filter Petugas Penagih</label>
+                      <select
+                        id="mass-bill-officer"
+                        value={massOfficerId}
+                        onChange={(e) => setMassOfficerId(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none border border-emerald-500/20 bg-emerald-500/5"
+                      >
+                        <option value="all" className="bg-slate-950 text-white">Semua Petugas (Kasir)</option>
+                        {users.filter(u => u.role === 'kasir').map((u) => {
+                          const areaName = areas.find(a => a.id === u.areaId)?.name || 'Semua';
+                          return (
+                            <option key={u.id} value={u.id} className="bg-slate-950 text-white">{u.name} (Area: {areaName})</option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Layanan</label>
+                      <select
+                        id="mass-bill-type"
+                        value={billType}
+                        onChange={(e) => {
+                          const type = e.target.value as BillType;
+                          setBillType(type);
+                          if (type === 'wifi') setBillAmount('150000');
+                          else if (type === 'pln') setBillAmount('185000');
+                          else setBillAmount('45000');
+                        }}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      >
+                        <option value="wifi" className="bg-slate-950 text-white">WiFi Internet</option>
+                        <option value="pln" className="bg-slate-950 text-white">Listrik PLN</option>
+                        <option value="pdam" className="bg-slate-950 text-white">PDAM Air Bersih</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nominal Standar</label>
+                      <input
+                        id="mass-bill-amount"
+                        type="number"
+                        required
+                        value={billAmount}
+                        onChange={(e) => setBillAmount(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bulan Tagihan</label>
+                      <input
+                        id="mass-bill-month"
+                        type="month"
+                        required
+                        value={billMonth}
+                        onChange={(e) => setBillMonth(e.target.value)}
+                        className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tanggal Jatuh Tempo Standar</label>
+                    <input
+                      id="mass-bill-due"
+                      type="date"
+                      required
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full text-xs glass-input rounded-lg p-2.5 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Customer Checklist Preview */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                        Daftar Calon Tagihan ({massMatchingPelanggan.length} Pelanggan)
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMassCheckedCustomerIds(massMatchingPelanggan.map(p => p.id))}
+                          className="text-[10px] font-bold text-emerald-400 hover:underline bg-transparent border-0 cursor-pointer"
+                        >
+                          Pilih Semua
+                        </button>
+                        <span className="text-slate-600 text-[10px]">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setMassCheckedCustomerIds([])}
+                          className="text-[10px] font-bold text-rose-400 hover:underline bg-transparent border-0 cursor-pointer"
+                        >
+                          Kosongkan
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto border border-white/5 rounded-xl bg-slate-950/50 p-2 space-y-1.5 scrollbar-thin">
+                      {massMatchingPelanggan.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic text-center py-4">
+                          Tidak ada pelanggan yang sesuai dengan filter wilayah dan petugas.
+                        </p>
+                      ) : (
+                        massMatchingPelanggan.map((p) => {
+                          const areaName = areas.find(a => a.id === p.areaId)?.name || 'N/A';
+                          const hasCustomNominal = p.nominalBulanan && p.nominalBulanan > 0;
+                          const amount = hasCustomNominal ? p.nominalBulanan! : Number(billAmount);
+                          const existingStatus = getExistingBillStatus(p.id, billType, billMonth);
+
+                          return (
+                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 text-[11px]">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id={`mass-check-${p.id}`}
+                                  checked={massCheckedCustomerIds.includes(p.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setMassCheckedCustomerIds(prev => [...prev, p.id]);
+                                    } else {
+                                      setMassCheckedCustomerIds(prev => prev.filter(id => id !== p.id));
+                                    }
+                                  }}
+                                  className="rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                />
+                                <label htmlFor={`mass-check-${p.id}`} className="font-bold text-white cursor-pointer select-none">
+                                  {p.name}
+                                  <span className="text-[9px] text-slate-400 font-medium block mt-0.5">{p.code} • {areaName}</span>
+                                </label>
+                              </div>
+
+                              <div className="text-right">
+                                <span className={`font-bold block ${hasCustomNominal ? 'text-amber-300' : 'text-slate-300'}`}>
+                                  {formatRupiah(amount)}
+                                  {hasCustomNominal && <span className="text-[8px] text-amber-400 block font-normal">(Nominal Khusus)</span>}
+                                </span>
+                                
+                                {existingStatus && (
+                                  <span className={`inline-block text-[8px] px-1 py-0.2 rounded font-extrabold mt-0.5 ${existingStatus === 'LUNAS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                    SUDAH ADA ({existingStatus})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
                 <button
@@ -617,7 +869,7 @@ export default function TagihanManager({
                   type="submit"
                   className="px-4 py-2 glass-btn-primary rounded-lg text-xs font-bold cursor-pointer transition"
                 >
-                  {editingTagihan ? 'Simpan Perubahan' : 'Buat Tagihan'}
+                  {editingTagihan ? 'Simpan Perubahan' : `Buat ${massCheckedCustomerIds.length} Tagihan Masal`}
                 </button>
               </div>
             </form>
