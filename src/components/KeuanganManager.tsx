@@ -806,7 +806,7 @@ export default function KeuanganManager({
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-white uppercase tracking-wider">Cetak Laporan Bulanan Resmi</h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Konfigurasi data, nama penandatangan, dan cetak laporan arus kas bulanan desa</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Konfigurasi data, nama penandatangan, dan cetak laporan arus kas bulanan</p>
                 </div>
               </div>
               <button 
@@ -854,7 +854,7 @@ export default function KeuanganManager({
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Pengesahan (Tanda Tangan)</h3>
                   
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Bendahara Desa</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Bendahara</label>
                     <input
                       type="text"
                       value={treasurerName}
@@ -865,7 +865,7 @@ export default function KeuanganManager({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Kepala Desa</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Owner</label>
                     <input
                       type="text"
                       value={villageHeadName}
@@ -915,10 +915,9 @@ export default function KeuanganManager({
                 <div className="flex-1 max-h-[520px] overflow-y-auto bg-white p-8 rounded-2xl shadow-inner text-black border border-slate-300/40 relative font-serif">
                   {/* Kop Surat Desa */}
                   <div className="text-center border-b-[3px] border-double border-black pb-4 mb-5">
-                    <h4 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">PEMERINTAH KABUPATEN MALANG</h4>
-                    <h5 className="text-sm font-extrabold tracking-wide uppercase text-black leading-tight">KECAMATAN SINGOSARI • DESA KRAJAN</h5>
-                    <p className="text-[10px] font-semibold text-black uppercase mt-1">KANTOR PENGELOLA AIR BERSIH & LAYANAN MANDIRI LOKET DIGITAL PRO</p>
-                    <p className="text-[9px] text-gray-700 italic mt-0.5">Jl. Raya Krajan Tengah No. 45, Singosari, Malang, Jawa Timur | Telp: 0812-3456-7890</p>
+                    <h4 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">PENGELOLA LAYANAN AIR BERSIH</h4>
+                    <h5 className="text-sm font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • KEMBLENGAN</h5>
+                    <p className="text-[9px] text-gray-700 italic mt-0.5">Kemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
                   </div>
 
                   {/* Judul Laporan */}
@@ -1030,20 +1029,20 @@ export default function KeuanganManager({
                     <div>
                       <p className="font-bold mb-12">
                         Mengetahui,<br/>
-                        Kepala Desa Krajan
+                        Owner
                       </p>
                       <p className="font-bold text-black underline uppercase">{villageHeadName || 'H. Ahmad Fauzi'}</p>
-                      <p className="text-[8px] text-gray-500 mt-0.5">Pemerintah Desa Krajan</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
                     </div>
 
                     <div>
                       <p className="font-bold mb-12 text-gray-900">
-                        Malang, {formatIndonesianDate(printDate)}<br/>
+                        Kemblengan, {formatIndonesianDate(printDate)}<br/>
                         Dibuat Oleh,<br/>
-                        Bendahara Pengelola
+                        Bendahara
                       </p>
                       <p className="font-bold text-black underline uppercase">{treasurerName || 'Siti Rahma, S.E.'}</p>
-                      <p className="text-[8px] text-gray-500 mt-0.5">Layanan Loket Digital</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
                     </div>
                   </div>
                 </div>
@@ -1060,10 +1059,9 @@ export default function KeuanganManager({
       <div id="printable-monthly-report-container" className="hidden font-serif">
         {/* Kop Surat Desa */}
         <div className="text-center border-b-[4px] border-double border-black pb-4 mb-6">
-          <h1 className="text-lg font-extrabold tracking-wide uppercase text-black leading-tight">PEMERINTAH KABUPATEN MALANG</h1>
-          <h2 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">KECAMATAN SINGOSARI • DESA KRAJAN</h2>
-          <p className="text-[11px] font-bold text-black uppercase mt-1">KANTOR PENGELOLA AIR BERSIH & LAYANAN MANDIRI LOKET DIGITAL PRO</p>
-          <p className="text-[10px] text-gray-800 italic mt-0.5">Jl. Raya Krajan Tengah No. 45, Singosari, Malang, Jawa Timur | Telp: 0812-3456-7890</p>
+          <h1 className="text-lg font-extrabold tracking-wide uppercase text-black leading-tight">PENGELOLA LAYANAN AIR BERSIH</h1>
+          <h2 className="text-base font-extrabold tracking-wide uppercase text-black leading-tight">LOKET DIGITAL PRO • KEMBLENGAN</h2>
+          <p className="text-[10px] text-gray-800 italic mt-0.5">Kemblengan, Jawa Timur | Telp: 0812-3456-7890</p>
         </div>
 
         {/* Judul Laporan */}
@@ -1175,20 +1173,20 @@ export default function KeuanganManager({
           <div>
             <p className="font-bold mb-14">
               Mengetahui,<br/>
-              Kepala Desa Krajan
+              Owner
             </p>
             <p className="font-bold text-black underline uppercase">{villageHeadName}</p>
-            <p className="text-[8px] text-gray-500 mt-0.5">Pemerintah Desa Krajan</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
           </div>
 
           <div>
             <p className="font-bold mb-14 text-gray-900">
-              Malang, {formatIndonesianDate(printDate)}<br/>
+              Kemblengan, {formatIndonesianDate(printDate)}<br/>
               Dibuat Oleh,<br/>
-              Bendahara Pengelola
+              Bendahara
             </p>
             <p className="font-bold text-black underline uppercase">{treasurerName}</p>
-            <p className="text-[8px] text-gray-500 mt-0.5">Layanan Loket Digital</p>
+            <p className="text-[8px] text-gray-500 mt-0.5">Kemblengan</p>
           </div>
         </div>
       </div>
