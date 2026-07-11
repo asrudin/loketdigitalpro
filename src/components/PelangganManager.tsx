@@ -22,6 +22,7 @@ interface PelangganManagerProps {
   onAddPelanggan: (p: Omit<Pelanggan, 'id' | 'code'> & { code?: string }) => void;
   onUpdatePelanggan: (p: Pelanggan) => void;
   onDeletePelanggan: (id: string) => void;
+  onDeleteMultiplePelanggan?: (ids: string[]) => void;
   onImportPelanggan: (data: (Omit<Pelanggan, 'id' | 'code'> & { code?: string })[]) => void;
 }
 
@@ -31,6 +32,7 @@ export default function PelangganManager({
   onAddPelanggan,
   onUpdatePelanggan,
   onDeletePelanggan,
+  onDeleteMultiplePelanggan,
   onImportPelanggan,
 }: PelangganManagerProps) {
   // Filters and state
@@ -38,6 +40,7 @@ export default function PelangganManager({
   const [selectedArea, setSelectedArea] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPelanggan, setEditingPelanggan] = useState<Pelanggan | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Form states
   const [code, setCode] = useState('');
@@ -446,6 +449,17 @@ export default function PelangganManager({
     return matchesSearch && matchesArea;
   });
 
+  const handleBulkDelete = () => {
+    if (!onDeleteMultiplePelanggan) {
+      alert("Fitur hapus kolektif tidak tersedia.");
+      return;
+    }
+    if (confirm(`PERINGATAN! Anda akan menghapus ${selectedIds.length} pelanggan secara massal. Semua data tagihan terkait yang belum terbayar juga akan dihapus. Tindakan ini tidak dapat dibatalkan! Apakah Anda yakin?`)) {
+      onDeleteMultiplePelanggan(selectedIds);
+      setSelectedIds([]);
+    }
+  };
+
   return (
     <div className="space-y-6 z-10 relative">
       {/* Header */}
@@ -666,12 +680,64 @@ Siti Aminah,Mulyorejo RT02,MLY,085734455,PDAM,75000,15'
         </div>
       </div>
 
+      {/* Selection / Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+            <span className="text-xs font-semibold text-rose-300">
+              {selectedIds.length} pelanggan terpilih untuk tindakan kolektif.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="px-3.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-600/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Hapus Terpilih
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Customer List Table */}
       <div className="glass-card rounded-2xl overflow-hidden shadow-lg border border-white/10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white/5">
+                <th className="py-3 px-4 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={filteredPelanggan.length > 0 && filteredPelanggan.every((p) => selectedIds.includes(p.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        // select all filtered
+                        setSelectedIds((prev) => {
+                          const newIds = [...prev];
+                          filteredPelanggan.forEach((p) => {
+                            if (!newIds.includes(p.id)) {
+                              newIds.push(p.id);
+                            }
+                          });
+                          return newIds;
+                        });
+                      } else {
+                        // deselect all filtered
+                        const filteredIds = filteredPelanggan.map((p) => p.id);
+                        setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+                      }
+                    }}
+                    className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500/20 cursor-pointer h-3.5 w-3.5"
+                  />
+                </th>
                 <th className="py-3 px-4">Nama Pelanggan</th>
                 <th className="py-3 px-4">Alamat Rumah</th>
                 <th className="py-3 px-4">Dusun / Area</th>
@@ -685,7 +751,7 @@ Siti Aminah,Mulyorejo RT02,MLY,085734455,PDAM,75000,15'
             <tbody className="divide-y divide-white/5 text-xs text-slate-300">
               {filteredPelanggan.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-500 italic font-medium">
+                  <td colSpan={9} className="py-10 text-center text-slate-500 italic font-medium">
                     Tidak ada data pelanggan yang sesuai dengan kriteria pencarian / filter.
                   </td>
                 </tr>
@@ -693,7 +759,21 @@ Siti Aminah,Mulyorejo RT02,MLY,085734455,PDAM,75000,15'
                 filteredPelanggan.map((p) => {
                   const areaName = areas.find((a) => a.id === p.areaId)?.name || 'N/A';
                   return (
-                    <tr key={p.id} className="hover:bg-white/5 transition duration-150">
+                    <tr key={p.id} className={`hover:bg-white/5 transition duration-150 ${selectedIds.includes(p.id) ? 'bg-white/5' : ''}`}>
+                      <td className="py-3 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [...prev, p.id]);
+                            } else {
+                              setSelectedIds((prev) => prev.filter((id) => id !== p.id));
+                            }
+                          }}
+                          className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500/20 cursor-pointer h-3.5 w-3.5"
+                        />
+                      </td>
                       <td className="py-3 px-4">
                         <span className="font-bold text-white block">{p.name}</span>
                         <span className="text-[10px] text-slate-400 font-mono block mt-0.5">{p.code}</span>
